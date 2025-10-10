@@ -1,0 +1,381 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f5f5f5;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #1a1a1a;
+}
+
+/* Contenedor principal con Grid */
+.container {
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  padding: 48px;
+  max-width: 900px;
+  width: 100%;
+}
+
+/* INDEX: Diseño compacto y centrado */
+body:has(a[href="cliente.html"]) .container {
+  max-width: 500px;
+  padding: 64px 48px;
+  text-align: center;
+}
+
+h1 {
+  color: #1a1a1a;
+  margin-bottom: 16px;
+  text-align: center;
+  font-size: 2em;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+/* Párrafo descriptivo más compacto */
+body:has(a[href="cliente.html"]) p {
+  margin: 8px 0 32px 0;
+  color: #666;
+  font-size: 0.95em;
+}
+
+h2 {
+  color: #1a1a1a;
+  margin: 32px 0 16px;
+  font-size: 1.2em;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+h3 {
+  color: #404040;
+  margin: 24px 0 12px;
+  font-size: 1.05em;
+  font-weight: 500;
+}
+
+/* Formularios con Grid - más compactos */
+form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+label {
+  color: #404040;
+  font-weight: 500;
+  font-size: 0.9em;
+  text-align: left;
+  margin-bottom: -10px;
+}
+
+input, select {
+  padding: 12px 16px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 1em;
+  transition: all 0.2s;
+  width: 100%;
+  background: white;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: #1a1a1a;
+  box-shadow: 0 0 0 3px rgba(26, 26, 26, 0.1);
+}
+
+/* Botones con alto contraste */
+button {
+  background: #1a1a1a;
+  color: white;
+  border: none;
+  padding: 14px 28px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 1em;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+button:hover {
+  background: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+/* Grid para enlaces de inicio - MÁS COMPACTO */
+.links-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 0;
+}
+
+.links-grid a {
+  display: block;
+  padding: 20px;
+  background: #1a1a1a;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.2s;
+  font-size: 1.05em;
+}
+
+.links-grid a:hover {
+  background: #000000;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ZONA TIENDA: Layout en 2 columnas para aprovechar espacio */
+body:has(#formTienda) .container {
+  max-width: 1100px;
+  padding: 40px;
+}
+
+/* Grid principal de tienda en 2 columnas */
+.tienda-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 24px;
+}
+
+/* Secciones de tienda */
+.tienda-section {
+  background: #fafafa;
+  padding: 24px;
+  border-radius: 4px;
+  border: 1px solid #e8e8e8;
+}
+
+.tienda-section h2 {
+  margin-top: 0;
+  font-size: 1.15em;
+}
+
+/* ZONA CLIENTE: Layout optimizado */
+body:has(#productosDisponibles) .container {
+  max-width: 1000px;
+  padding: 40px;
+}
+
+.cliente-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.cliente-header h1 {
+  margin: 0;
+  text-align: left;
+}
+
+/* Grid para listas de productos - más compacto */
+ul {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+ul li {
+  background: white;
+  padding: 14px 16px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+  font-size: 0.95em;
+}
+
+ul li:hover {
+  border-color: #1a1a1a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+ul li button {
+  margin: 0;
+  padding: 8px 18px;
+  font-size: 0.9em;
+  grid-column: 2;
+  background: #1a1a1a;
+}
+
+ul li button:hover {
+  background: #000000;
+}
+
+/* Mensajes y resultado - más compacto */
+#resultado, #mensaje {
+  background: #f5f5f5;
+  padding: 14px 16px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  margin: 16px 0;
+  color: #1a1a1a;
+  font-weight: 500;
+  text-align: center;
+  font-size: 0.95em;
+}
+
+p {
+  text-align: center;
+  margin: 16px 0;
+  color: #404040;
+  line-height: 1.6;
+}
+
+/* Enlaces con alto contraste */
+a {
+  color: #1a1a1a;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s;
+  border-bottom: 2px solid #1a1a1a;
+  padding-bottom: 2px;
+}
+
+a:hover {
+  opacity: 0.7;
+}
+
+/* Grid para secciones de tienda */
+.tienda-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+/* Grid para historial - una columna compacta */
+#historial {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+#historial li {
+  grid-template-columns: 1fr;
+  text-align: left;
+  padding: 12px 14px;
+}
+
+/* Botón de cerrar sesión - más compacto */
+button[onclick="logout()"] {
+  margin-top: 32px;
+  background: white;
+  color: #1a1a1a;
+  border: 1px solid #d0d0d0;
+  padding: 12px 24px;
+}
+
+button[onclick="logout()"]:hover {
+  background: #f5f5f5;
+  border-color: #1a1a1a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Separador visual minimalista */
+.tienda-section h2::after,
+h2::after {
+  content: '';
+  display: block;
+  width: 30px;
+  height: 2px;
+  background: #1a1a1a;
+  margin-top: 10px;
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+  .tienda-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 32px 24px;
+  }
+
+  body:has(a[href="cliente.html"]) .container,
+  body:has(#formTienda) .container,
+  body:has(#productosDisponibles) .container {
+    padding: 32px 24px;
+  }
+
+  h1 {
+    font-size: 1.6em;
+  }
+
+  .cliente-header {
+    grid-template-columns: 1fr;
+  }
+
+  .cliente-header h1 {
+    text-align: center;
+  }
+
+  ul {
+    grid-template-columns: 1fr;
+  }
+
+  ul li {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  ul li button {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .links-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 12px;
+  }
+
+  .container {
+    padding: 24px 16px;
+  }
+
+  body:has(a[href="cliente.html"]) .container {
+    padding: 40px 24px;
+  }
+
+  form {
+    gap: 14px;
+  }
+}

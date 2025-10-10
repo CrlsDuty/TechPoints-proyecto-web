@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Zona Tienda</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+  <!-- En login.html, registro.html, cliente.html y tienda.html -->
+  <script defer src="services/authService.js"></script>
+  <script defer src="services/productService.js"></script>
+  <script defer src="services/storeService.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <h1>Zona Tienda</h1>
+  
+  <h2>Agregar puntos a clientes</h2>
+  <form id="formTienda">
+    <label for="cliente">Correo del cliente:</label>
+    <input type="email" id="cliente" required>
+    <label for="puntos">Puntos a agregar:</label>
+    <input type="number" id="puntos" required>
+    <button type="submit">Agregar puntos</button>
+  </form>
+  <p id="mensaje"></p>
+
+  <h2>Administrar productos</h2>
+  <form id="formProducto">
+    <label for="nombreProd">Nombre del producto:</label>
+    <input type="text" id="nombreProd" required>
+    <label for="costoProd">Costo en puntos:</label>
+    <input type="number" id="costoProd" required>
+    <button type="submit">Agregar producto</button>
+  </form>
+  
+  <h3>Mis productos</h3>
+  <ul id="listaProductos"></ul>
+
+  <button onclick="logout()">Cerrar sesión</button>
+</body>
+</html>

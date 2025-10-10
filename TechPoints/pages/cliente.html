@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Zona Cliente</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+  <!-- En login.html, registro.html, cliente.html y tienda.html -->
+  <script defer src="../assets/js/authservice.js"></script>
+  <script defer src="../assets/js/productService.js"></script>
+  <script defer src="../assets/js/storeService.js"></script>
+  <script defer src="../assets/js/app.js"></script>
+</head>
+<body>
+  <h1>Zona Cliente</h1>
+  <p id="resultado"></p>
+
+  <h2>Productos disponibles</h2>
+  <ul id="productosDisponibles"></ul>
+
+  <h2>Historial de Canjes</h2>
+  <ul id="historial"></ul>
+
+  <button onclick="logout()">Cerrar sesión</button>
+</body>
+</html>
