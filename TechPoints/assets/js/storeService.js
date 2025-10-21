@@ -4,43 +4,46 @@
 const StoreService = {
   // Agregar puntos a un cliente
   agregarPuntosCliente(clienteEmail, puntos) {
-    // Validaciones
-    if (!clienteEmail || !puntos) {
-      return { success: false, message: "Email y puntos son requeridos" };
-    }
+    return new Promise(async (resolve) => {
+      if (!clienteEmail || !puntos) {
+        return resolve({ success: false, message: "Email y puntos son requeridos" });
+      }
 
-    const puntosNum = parseInt(puntos);
-    
-    if (isNaN(puntosNum) || puntosNum <= 0) {
-      return { success: false, message: "Los puntos deben ser un número mayor a 0" };
-    }
+      const puntosNum = parseInt(puntos);
+      if (isNaN(puntosNum) || puntosNum <= 0) {
+        return resolve({ success: false, message: "Los puntos deben ser un número mayor a 0" });
+      }
 
-    // Buscar cliente
-    const cliente = AuthService.buscarUsuarioPorEmail(clienteEmail);
+      // Simular operación asíncrona
+      if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(200);
 
-    if (!cliente) {
-      return { success: false, message: "Cliente no encontrado" };
-    }
+      // Buscar cliente
+      const cliente = AuthService.buscarUsuarioPorEmail(clienteEmail);
 
-    if (cliente.role !== "cliente") {
-      return { success: false, message: "Este usuario no es un cliente" };
-    }
+      if (!cliente) {
+        return resolve({ success: false, message: "Cliente no encontrado" });
+      }
 
-    // Agregar puntos
-    cliente.puntos = (cliente.puntos || 0) + puntosNum;
+      if (cliente.role !== "cliente") {
+        return resolve({ success: false, message: "Este usuario no es un cliente" });
+      }
 
-    // Actualizar cliente
-    const resultado = AuthService.actualizarUsuario(cliente);
+      // Agregar puntos
+      cliente.puntos = (cliente.puntos || 0) + puntosNum;
 
-    if (resultado.success) {
-      return { 
-        success: true, 
-        message: `Se agregaron ${puntosNum} puntos a ${clienteEmail}`,
-        puntosNuevos: cliente.puntos
-      };
-    }
+      // Actualizar cliente
+      const resultado = AuthService.actualizarUsuario(cliente);
 
-    return { success: false, message: "Error al actualizar puntos" };
+      if (resultado.success) {
+        return resolve({ 
+          success: true, 
+          message: `Se agregaron ${puntosNum} puntos a ${clienteEmail}`,
+          puntosNuevos: cliente.puntos
+        });
+      }
+
+      return resolve({ success: false, message: "Error al actualizar puntos" });
+    });
   },
 
   // Obtener estadísticas de la tienda (opcional para futuras mejoras)
