@@ -379,3 +379,217 @@ h2::after {
     gap: 14px;
   }
 }
+
+/* Agregar al final de style.css - Mejoras adicionales */
+
+/* ========== ANIMACIONES ========== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.container {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ========== ESTADOS DE BOTONES ========== */
+button:disabled {
+  background: #9ca3af !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+button:disabled:hover {
+  box-shadow: none !important;
+}
+
+/* ========== MEJORAS EN FORMULARIOS ========== */
+input:invalid:not(:placeholder-shown) {
+  border-color: #ef4444;
+}
+
+input:valid:not(:placeholder-shown) {
+  border-color: #10b981;
+}
+
+/* ========== TARJETAS DE PRODUCTOS MEJORADAS ========== */
+ul li {
+  position: relative;
+  overflow: hidden;
+}
+
+ul li::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: #0ea5e9;
+  transform: scaleY(0);
+  transition: transform 0.3s;
+}
+
+ul li:hover::before {
+  transform: scaleY(1);
+}
+
+/* ========== MENSAJES DE ESTADO ========== */
+#mensaje {
+  transition: all 0.3s;
+  display: none;
+}
+
+#mensaje:not(:empty) {
+  display: block;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ========== BADGES Y ETIQUETAS ========== */
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: #f0f9ff;
+  color: #0369a1;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+/* ========== LOADING STATES ========== */
+.loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin: -8px 0 0 -8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========== TOOLTIPS ========== */
+[title] {
+  position: relative;
+  cursor: help;
+}
+
+/* ========== EMPTY STATES MEJORADOS ========== */
+ul li[style*="text-align: center"] {
+  background: transparent;
+  border: 2px dashed #e0e0e0;
+  padding: 40px 20px;
+}
+
+/* ========== RESPONSIVE MEJORADO ========== */
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.5em;
+  }
+  
+  h2 {
+    font-size: 1.1em;
+  }
+  
+  button {
+    width: 100%;
+  }
+  
+  .tienda-section {
+    padding: 16px;
+  }
+}
+
+/* ========== ACCESIBILIDAD ========== */
+:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* ========== DARK MODE (opcional para futuro) ========== */
+@media (prefers-color-scheme: dark) {
+  /* Descomenta si quieres soporte dark mode automático
+  body {
+    background: #1a1a1a;
+    color: #f5f5f5;
+  }
+  
+  .container {
+    background: #262626;
+    border-color: #404040;
+  }
+  */
+}
+
+/* ========== SECCIÓN HEADER CLIENTE/TIENDA ========== */
+.cliente-header {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  padding: 24px;
+  border-radius: 8px;
+  margin: -8px -8px 24px -8px;
+}
+
+/* ========== CONTADOR DE PUNTOS DESTACADO ========== */
+#resultado {
+  position: relative;
+  overflow: hidden;
+}
+
+#resultado::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+  pointer-events: none;
+}
+
+/* ========== MEJORAS EN TIENDA SECTION ========== */
+.tienda-section {
+  position: relative;
+  transition: all 0.3s;
+}
+
+.tienda-section:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ========== SCROLL SUAVE ========== */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ========== SELECCIÓN DE TEXTO ========== */
+::selection {
+  background: #0ea5e9;
+  color: white;
+}
