@@ -15,27 +15,33 @@ const ProductService = {
 
   // Agregar nuevo producto
   agregarProducto(tiendaEmail, nombre, costo) {
-    // Validaciones
-    if (!nombre || !costo) {
-      return { success: false, message: "Nombre y costo son requeridos" };
-    }
+    // Retorna una Promise para demostrar operaciones asíncronas
+    return new Promise(async (resolve) => {
+      // Simular delay
+      if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(300);
 
-    if (costo <= 0) {
-      return { success: false, message: "El costo debe ser mayor a 0" };
-    }
+      // Validaciones
+      if (!nombre || !costo) {
+        return resolve({ success: false, message: "Nombre y costo son requeridos" });
+      }
 
-    const productos = this.obtenerProductos();
-    const nuevoProducto = {
-      id: Date.now(), // ID único basado en timestamp
-      tienda: tiendaEmail,
-      nombre: nombre.trim(),
-      costo: parseInt(costo)
-    };
+      if (costo <= 0) {
+        return resolve({ success: false, message: "El costo debe ser mayor a 0" });
+      }
 
-    productos.push(nuevoProducto);
-    this.guardarProductos(productos);
+      const productos = this.obtenerProductos();
+      const nuevoProducto = {
+        id: Date.now(), // ID único basado en timestamp
+        tienda: tiendaEmail,
+        nombre: nombre.trim(),
+        costo: parseInt(costo)
+      };
 
-    return { success: true, producto: nuevoProducto };
+      productos.push(nuevoProducto);
+      this.guardarProductos(productos);
+
+      return resolve({ success: true, producto: nuevoProducto });
+    });
   },
 
   // Obtener productos de una tienda específica
@@ -46,52 +52,57 @@ const ProductService = {
 
   // Canjear producto (reducir puntos del cliente)
   canjearProducto(clienteEmail, productoIndex) {
-    const productos = this.obtenerProductos();
-    const producto = productos[productoIndex];
+    // Retorna una Promise para poder usar async/await
+    return new Promise(async (resolve) => {
+      if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(250);
 
-    if (!producto) {
-      return { success: false, message: "Producto no encontrado" };
-    }
+      const productos = this.obtenerProductos();
+      const producto = productos[productoIndex];
 
-    // Obtener cliente
-    const cliente = AuthService.buscarUsuarioPorEmail(clienteEmail);
-    
-    if (!cliente) {
-      return { success: false, message: "Cliente no encontrado" };
-    }
+      if (!producto) {
+        return resolve({ success: false, message: "Producto no encontrado" });
+      }
 
-    // Verificar puntos suficientes
-    if (cliente.puntos < producto.costo) {
-      return { 
-        success: false, 
-        message: "No tienes suficientes puntos para canjear este producto",
-        puntosNecesarios: producto.costo,
-        puntosActuales: cliente.puntos
-      };
-    }
+      // Obtener cliente
+      const cliente = AuthService.buscarUsuarioPorEmail(clienteEmail);
+      
+      if (!cliente) {
+        return resolve({ success: false, message: "Cliente no encontrado" });
+      }
 
-    // Realizar canje
-    cliente.puntos -= producto.costo;
-    cliente.historial = cliente.historial || [];
-    cliente.historial.push({
-      producto: producto.nombre,
-      costo: producto.costo,
-      fecha: new Date().toLocaleDateString(),
-      tienda: producto.tienda
+      // Verificar puntos suficientes
+      if (cliente.puntos < producto.costo) {
+        return resolve({ 
+          success: false, 
+          message: "No tienes suficientes puntos para canjear este producto",
+          puntosNecesarios: producto.costo,
+          puntosActuales: cliente.puntos
+        });
+      }
+
+      // Realizar canje
+      cliente.puntos -= producto.costo;
+      cliente.historial = cliente.historial || [];
+      cliente.historial.push({
+        producto: producto.nombre,
+        costo: producto.costo,
+        fecha: new Date().toLocaleDateString(),
+        tienda: producto.tienda
+      });
+
+      // Actualizar cliente
+      const resultado = AuthService.actualizarUsuario(cliente);
+
+      if (resultado.success) {
+        return resolve({ 
+          success: true, 
+          message: `\u00a1Canje exitoso! Has canjeado ${producto.nombre}`,
+          cliente
+        });
+      }
+
+      return resolve({ success: false, message: "Error al actualizar cliente" });
     });
-
-    // Actualizar cliente
-    const resultado = AuthService.actualizarUsuario(cliente);
-
-    if (resultado.success) {
-      return { 
-        success: true, 
-        message: `¡Canje exitoso! Has canjeado ${producto.nombre}`,
-        cliente
-      };
-    }
-
-    return { success: false, message: "Error al actualizar cliente" };
   },
 
   // Eliminar producto (opcional para futuras mejoras)
