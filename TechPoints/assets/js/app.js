@@ -121,15 +121,31 @@ function inicializarRegistro(formRegistro) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Registrando...';
 
-    const resultado = AuthService.registrarUsuario(email, password, role);
+    // Demostración de callback (Utils.delayWithCallback)
+    if (window.Utils && typeof Utils.delayWithCallback === 'function') {
+      Utils.delayWithCallback(400, () => {
+        const resultado = AuthService.registrarUsuario(email, password, role);
 
-    if (resultado.success) {
-      alert(resultado.message + " Redirigiendo al login...");
-      window.location.href = "login.html";
+        if (resultado.success) {
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message + ' Redirigiendo...', 'success');
+          setTimeout(() => window.location.href = 'login.html', 600);
+        } else {
+          alert(resultado.message);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Registrarse';
+        }
+      });
     } else {
-      alert(resultado.message);
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Registrarse';
+      // Fallback síncrono
+      const resultado = AuthService.registrarUsuario(email, password, role);
+      if (resultado.success) {
+        alert(resultado.message + " Redirigiendo al login...");
+        window.location.href = "login.html";
+      } else {
+        alert(resultado.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Registrarse';
+      }
     }
   });
 }
@@ -196,20 +212,27 @@ function canjearProducto(index) {
     return;
   }
 
-  const resultado = ProductService.canjearProducto(usuarioActivo.email, index);
+  (async () => {
+    try {
+      const resultado = await ProductService.canjearProducto(usuarioActivo.email, index);
 
-  if (resultado.success) {
-    alert('✅ ' + resultado.message);
-    actualizarInfoCliente(resultado.cliente);
-    mostrarProductosDisponibles();
-    mostrarHistorial();
-  } else {
-    if (resultado.puntosNecesarios) {
-      alert(`❌ ${resultado.message}\n\nNecesitas: ${resultado.puntosNecesarios} puntos\nTienes: ${resultado.puntosActuales} puntos\nFaltan: ${resultado.puntosNecesarios - resultado.puntosActuales} puntos`);
-    } else {
-      alert('❌ ' + resultado.message);
+      if (resultado.success) {
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'success');
+        actualizarInfoCliente(resultado.cliente);
+        mostrarProductosDisponibles();
+        mostrarHistorial();
+      } else {
+        if (resultado.puntosNecesarios) {
+          alert(`❌ ${resultado.message}\n\nNecesitas: ${resultado.puntosNecesarios} puntos\nTienes: ${resultado.puntosActuales} puntos\nFaltan: ${resultado.puntosNecesarios - resultado.puntosActuales} puntos`);
+        } else {
+          alert('❌ ' + resultado.message);
+        }
+      }
+    } catch (err) {
+      console.error('Error en canje:', err);
+      alert('❌ Error inesperado durante el canje');
     }
-  }
+  })();
 }
 
 function mostrarHistorial() {
@@ -262,10 +285,9 @@ function mostrarInfoTienda(usuarioActivo) {
 function configurarFormularioPuntos() {
   const formTienda = document.getElementById("formTienda");
   if (!formTienda) return;
-
-  formTienda.addEventListener("submit", e => {
+  formTienda.addEventListener("submit", async e => {
     e.preventDefault();
-    
+
     const clienteEmail = document.getElementById("cliente").value.trim();
     const puntos = document.getElementById("puntos").value.trim();
     const submitBtn = formTienda.querySelector('button[type="submit"]');
@@ -274,20 +296,26 @@ function configurarFormularioPuntos() {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Procesando...';
 
-    const resultado = StoreService.agregarPuntosCliente(clienteEmail, puntos);
-    
-    if (mensaje) {
-      mensaje.textContent = resultado.success ? '✅ ' + resultado.message : '❌ ' + resultado.message;
-      mensaje.style.color = resultado.success ? "#059669" : "#dc2626";
-      mensaje.style.background = resultado.success ? "#d1fae5" : "#fee2e2";
-    }
+    try {
+      const resultado = await StoreService.agregarPuntosCliente(clienteEmail, puntos);
 
-    if (resultado.success) {
-      formTienda.reset();
-    }
+      if (mensaje) {
+        mensaje.textContent = resultado.success ? '✅ ' + resultado.message : '❌ ' + resultado.message;
+        mensaje.style.color = resultado.success ? "#059669" : "#dc2626";
+        mensaje.style.background = resultado.success ? "#d1fae5" : "#fee2e2";
+      }
 
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Agregar Puntos';
+      if (resultado.success) formTienda.reset();
+    } catch (err) {
+      console.error('Error agregando puntos:', err);
+      if (mensaje) {
+        mensaje.textContent = '❌ Error inesperado';
+        mensaje.style.color = '#dc2626';
+      }
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Agregar Puntos';
+    }
   });
 }
 
@@ -304,21 +332,28 @@ function configurarFormularioProductos(usuarioActivo) {
     const costo = document.getElementById("costoProd").value.trim();
     const submitBtn = formProducto.querySelector('button[type="submit"]');
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Agregando...';
+    (async () => {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Agregando...';
 
-    const resultado = ProductService.agregarProducto(usuarioActivo.email, nombre, costo);
+      try {
+        const resultado = await ProductService.agregarProducto(usuarioActivo.email, nombre, costo);
 
-    if (resultado.success) {
-      alert("✅ Producto agregado exitosamente");
-      formProducto.reset();
-      mostrarProductosTienda(usuarioActivo.email);
-    } else {
-      alert("❌ " + resultado.message);
-    }
-
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Agregar Producto';
+        if (resultado.success) {
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto agregado correctamente', 'success');
+          formProducto.reset();
+          mostrarProductosTienda(usuarioActivo.email);
+        } else {
+          alert('❌ ' + resultado.message);
+        }
+      } catch (err) {
+        console.error('Error agregando producto:', err);
+        alert('❌ Error inesperado');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Agregar Producto';
+      }
+    })();
   });
 }
 
