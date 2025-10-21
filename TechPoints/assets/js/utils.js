@@ -183,6 +183,7 @@ const Utils = {
       return success;
     }
   },
+  
 
   /**
    * Ordena array de objetos por una propiedad
@@ -321,3 +322,13 @@ const toastStyles = `
 
 // Exportar para usar en otros archivos
 window.Utils = Utils;
+
+// Helpers asíncronos (delay y callback) para demostraciones
+Utils.delay = function(ms = 300) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+
+Utils.delayWithCallback = function(ms = 300, cb) {
+  if (typeof cb !== 'function') return;
+  setTimeout(() => cb(), ms);
+};
