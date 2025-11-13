@@ -10,21 +10,21 @@ function verificarAutenticacion() {
   const esProtegida = paginasProtegidas.some(p => paginaActual.includes(p));
 
   if (esProtegida && !usuarioActivo) {
-    alert('Debes iniciar sesión para acceder a esta página');
-    window.location.href = 'login.html';
+    if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Debes iniciar sesión para acceder a esta página', 'warning');
+    setTimeout(() => window.location.href = 'login.html', 1500);
     return false;
   }
 
   // Verificar que el usuario tenga el rol correcto
   if (paginaActual.includes('cliente.html') && usuarioActivo?.role !== 'cliente') {
-    alert('No tienes permisos para acceder a esta página');
-    window.location.href = 'tienda.html';
+    if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('No tienes permisos para acceder a esta página', 'error');
+    setTimeout(() => window.location.href = 'tienda.html', 1500);
     return false;
   }
 
   if (paginaActual.includes('tienda.html') && usuarioActivo?.role !== 'tienda') {
-    alert('No tienes permisos para acceder a esta página');
-    window.location.href = 'cliente.html';
+    if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('No tienes permisos para acceder a esta página', 'error');
+    setTimeout(() => window.location.href = 'cliente.html', 1500);
     return false;
   }
 
@@ -95,7 +95,7 @@ function inicializarLogin(formLogin) {
         window.location.href = "tienda.html";
       }
     } else {
-      alert(resultado.message);
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Iniciar Sesión';
     }
@@ -114,7 +114,7 @@ function inicializarRegistro(formRegistro) {
 
     // Validación del rol
     if (!role) {
-      alert('Por favor selecciona un tipo de cuenta');
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Por favor selecciona un tipo de cuenta', 'warning');
       return;
     }
 
@@ -130,7 +130,7 @@ function inicializarRegistro(formRegistro) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message + ' Redirigiendo...', 'success');
           setTimeout(() => window.location.href = 'login.html', 600);
         } else {
-          alert(resultado.message);
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
           submitBtn.disabled = false;
           submitBtn.textContent = 'Registrarse';
         }
@@ -139,10 +139,10 @@ function inicializarRegistro(formRegistro) {
       // Fallback síncrono
       const resultado = AuthService.registrarUsuario(email, password, role);
       if (resultado.success) {
-        alert(resultado.message + " Redirigiendo al login...");
-        window.location.href = "login.html";
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message + " Redirigiendo al login...", 'success');
+        setTimeout(() => window.location.href = 'login.html', 1000);
       } else {
-        alert(resultado.message);
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
         submitBtn.disabled = false;
         submitBtn.textContent = 'Registrarse';
       }
@@ -223,14 +223,15 @@ function canjearProducto(index) {
         mostrarHistorial();
       } else {
         if (resultado.puntosNecesarios) {
-          alert(`❌ ${resultado.message}\n\nNecesitas: ${resultado.puntosNecesarios} puntos\nTienes: ${resultado.puntosActuales} puntos\nFaltan: ${resultado.puntosNecesarios - resultado.puntosActuales} puntos`);
+          const faltanPuntos = resultado.puntosNecesarios - resultado.puntosActuales;
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(`${resultado.message} (necesitas ${faltanPuntos} puntos más)`, 'error');
         } else {
-          alert('❌ ' + resultado.message);
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
         }
       }
     } catch (err) {
       console.error('Error en canje:', err);
-      alert('❌ Error inesperado durante el canje');
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Error inesperado durante el canje', 'error');
     }
   })();
 }
@@ -344,11 +345,11 @@ function configurarFormularioProductos(usuarioActivo) {
           formProducto.reset();
           mostrarProductosTienda(usuarioActivo.email);
         } else {
-          alert('❌ ' + resultado.message);
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
         }
       } catch (err) {
         console.error('Error agregando producto:', err);
-        alert('❌ Error inesperado');
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Error inesperado al agregar producto', 'error');
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Agregar Producto';
