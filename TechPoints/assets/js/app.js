@@ -390,8 +390,8 @@ function mostrarProductosTienda(tiendaEmail) {
 
 // ========== LOGOUT ==========
 function logout() {
-  if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-    AuthService.cerrarSesion();
-    window.location.href = "login.html";
-  }
+  
+  AuthService.cerrarSesion();
+  window.location.href = "login.html";
+  
 }
