@@ -12,15 +12,61 @@
   <script defer src="../assets/js/app.js"></script>
 </head>
 <body>
-  <h1>Zona Cliente</h1>
-  <p id="resultado"></p>
+  <div class="cliente-layout">
+    <!-- SIDEBAR IZQUIERDO: Información del usuario e historial -->
+    <aside class="cliente-sidebar">
+      <div class="cliente-card">
+        <h1>Mis Datos</h1>
+        <div id="resultado"></div>
+      </div>
 
-  <h2>Productos disponibles</h2>
-  <ul id="productosDisponibles"></ul>
+      <div class="cliente-card">
+        <h2>Historial de Canjes</h2>
+        <ul id="historial" class="historial-list"></ul>
+      </div>
 
-  <h2>Historial de Canjes</h2>
-  <ul id="historial"></ul>
+      <button onclick="logout()" class="btn-logout">Cerrar sesión</button>
+    </aside>
 
-  <button onclick="logout()">Cerrar sesión</button>
+    <!-- CONTENIDO PRINCIPAL: Productos disponibles -->
+    <main class="cliente-main">
+      <h1>Productos Disponibles</h1>
+      <div id="productosDisponibles" class="productos-grid"></div>
+    </main>
+  </div>
+
+  <!-- MODAL: Detalle de producto para canje -->
+  <div id="modalProducto" class="modal">
+    <div class="modal-content">
+      <span class="modal-close">&times;</span>
+      <div class="modal-header">
+        <h2 id="modalProductoNombre"></h2>
+      </div>
+      <div class="modal-body">
+        <div id="modalProductoImagen" class="modal-imagen"></div>
+        <div class="modal-info">
+          <p id="modalProductoDescripcion"></p>
+          <div class="modal-precios">
+            <div class="precio-item">
+              <span class="precio-label">Precio en Dólares:</span>
+              <span id="modalProductoPrecioDolar" class="precio-valor"></span>
+            </div>
+            <div class="precio-item">
+              <span class="precio-label">Conversión a Puntos:</span>
+              <span id="modalProductoPuntos" class="precio-valor puntos-badge"></span>
+            </div>
+            <div class="precio-item">
+              <span class="precio-label">Tus Puntos Disponibles:</span>
+              <span id="modalProductosPuntosCliente" class="precio-valor"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelarCanje" class="btn-secondary">Cancelar</button>
+        <button id="btnConfirmarCanje" class="btn-primary">Confirmar Canje</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

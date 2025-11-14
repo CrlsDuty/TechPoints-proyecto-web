@@ -151,10 +151,14 @@ function inicializarRegistro(formRegistro) {
 }
 
 // ========== CLIENTE ==========
+// Constante: Ratio de conversión puntos/dólar (ajustable según negocio)
+const CONVERSION_RATIO = 1; // 1 punto = $1 dólar (puedes cambiar este valor)
+
 function inicializarCliente(usuarioActivo) {
   actualizarInfoCliente(usuarioActivo);
   mostrarProductosDisponibles();
   mostrarHistorial();
+  configurarModal();
 }
 
 function actualizarInfoCliente(usuario) {
@@ -167,73 +171,138 @@ function actualizarInfoCliente(usuario) {
   }
 }
 
+// Función de conversión: dólares → puntos
+function convertirDolaresAPuntos(dolares) {
+  return Math.ceil(dolares * CONVERSION_RATIO);
+}
+
+// Función de conversión: puntos → dólares
+function convertirPuntosADolares(puntos) {
+  return (puntos / CONVERSION_RATIO).toFixed(2);
+}
+
 function mostrarProductosDisponibles() {
   const productos = ProductService.obtenerProductos();
-  const lista = document.getElementById("productosDisponibles");
+  const contenedor = document.getElementById("productosDisponibles");
   
-  if (!lista) return;
+  if (!contenedor) return;
   
-  lista.innerHTML = "";
+  contenedor.innerHTML = "";
 
   if (productos.length === 0) {
-    lista.innerHTML = `
-      <li style='grid-column: 1/-1; text-align: center; color: #999; padding: 40px;'>
-        <span style='font-size: 2em;'>📦</span><br>
+    contenedor.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; color: #999; padding: 40px;">
+        <span style="font-size: 2em;">📦</span><br>
         No hay productos disponibles para canje
-      </li>
+      </div>
     `;
     return;
   }
 
   productos.forEach((producto, index) => {
-    const li = document.createElement("li");
+    const puntosConvertidos = convertirDolaresAPuntos(producto.precioDolar || producto.costo);
+    const dolares = producto.precioDolar || convertirPuntosADolares(producto.costo);
     
-    const info = document.createElement("div");
-    info.innerHTML = `
-      <strong>${producto.nombre}</strong><br>
-      <span style="font-size: 0.85em; color: #666;">Por ${producto.tienda}</span><br>
-      <span style="font-size: 0.9em; color: #0ea5e9; font-weight: 600;">${producto.costo} puntos</span>
+    const card = document.createElement("div");
+    card.className = "producto-card";
+    card.innerHTML = `
+      <h3 class="producto-nombre">${producto.nombre}</h3>
+      <p class="producto-tienda">Por ${producto.tienda}</p>
+      <div class="producto-precios">
+        <div class="precio-dolar">
+          <span class="label">Precio:</span>
+          <span class="valor">$${dolares}</span>
+        </div>
+        <div class="precio-puntos">
+          <span class="label">Puntos:</span>
+          <span class="valor">${puntosConvertidos} pts</span>
+        </div>
+      </div>
+      <button class="producto-btn">Ver Detalles</button>
     `;
     
-    const btn = document.createElement("button");
-    btn.textContent = "Canjear";
-    btn.onclick = () => canjearProducto(index);
-
-    li.appendChild(info);
-    li.appendChild(btn);
-    lista.appendChild(li);
+    card.onclick = () => abrirModalProducto(producto, index, puntosConvertidos, dolares);
+    contenedor.appendChild(card);
   });
 }
 
-function canjearProducto(index) {
+function abrirModalProducto(producto, index, puntos, dolares) {
+  const usuarioActivo = AuthService.obtenerUsuarioActivo();
+  const modal = document.getElementById("modalProducto");
+  
+  // Llenar datos del modal
+  document.getElementById("modalProductoNombre").textContent = producto.nombre;
+  document.getElementById("modalProductoDescripcion").textContent = 
+    producto.descripcion || "Producto disponible para canje en nuestro sistema de puntos";
+  document.getElementById("modalProductoPrecioDolar").textContent = `$${dolares}`;
+  document.getElementById("modalProductoPuntos").textContent = `${puntos} pts`;
+  document.getElementById("modalProductosPuntosCliente").textContent = `${usuarioActivo.puntos || 0} pts`;
+  
+  // Mostrar imagen (placeholder si no hay)
+  const imagenContainer = document.getElementById("modalProductoImagen");
+  imagenContainer.innerHTML = producto.imagen ? 
+    `<img src="${producto.imagen}" alt="${producto.nombre}" style="max-width: 100%; border-radius: 6px;">` :
+    `<span>Imagen no disponible</span>`;
+  
+  // Configurar botón de canje
+  const btnConfirmar = document.getElementById("btnConfirmarCanje");
+  btnConfirmar.disabled = (usuarioActivo.puntos || 0) < puntos;
+  btnConfirmar.onclick = () => confirmarCanjeDesdeModal(index, usuarioActivo.email, puntos);
+  
+  // Abrir modal
+  modal.classList.add("active");
+}
+
+function confirmarCanjeDesdeModal(index, email, puntosRequeridos) {
   const usuarioActivo = AuthService.obtenerUsuarioActivo();
   
-  if (!confirm('¿Estás seguro de que quieres canjear este producto?')) {
+  if ((usuarioActivo.puntos || 0) < puntosRequeridos) {
+    if (Utils && typeof Utils.mostrarToast === 'function') {
+      const faltanPuntos = puntosRequeridos - (usuarioActivo.puntos || 0);
+      Utils.mostrarToast(`Puntos insuficientes. Necesitas ${faltanPuntos} puntos más`, 'error');
+    }
     return;
   }
 
   (async () => {
     try {
-      const resultado = await ProductService.canjearProducto(usuarioActivo.email, index);
+      const resultado = await ProductService.canjearProducto(email, index);
 
       if (resultado.success) {
+        cerrarModalProducto();
         if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'success');
         actualizarInfoCliente(resultado.cliente);
         mostrarProductosDisponibles();
         mostrarHistorial();
       } else {
-        if (resultado.puntosNecesarios) {
-          const faltanPuntos = resultado.puntosNecesarios - resultado.puntosActuales;
-          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(`${resultado.message} (necesitas ${faltanPuntos} puntos más)`, 'error');
-        } else {
-          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
-        }
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
       }
     } catch (err) {
       console.error('Error en canje:', err);
       if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Error inesperado durante el canje', 'error');
     }
   })();
+}
+
+function configurarModal() {
+  const modal = document.getElementById("modalProducto");
+  const btnCerrar = document.querySelector(".modal-close");
+  const btnCancelar = document.getElementById("btnCancelarCanje");
+  
+  if (!modal) return;
+  
+  btnCerrar?.addEventListener("click", cerrarModalProducto);
+  btnCancelar?.addEventListener("click", cerrarModalProducto);
+  
+  // Cerrar modal al hacer clic fuera de él
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) cerrarModalProducto();
+  });
+}
+
+function cerrarModalProducto() {
+  const modal = document.getElementById("modalProducto");
+  if (modal) modal.classList.remove("active");
 }
 
 function mostrarHistorial() {
@@ -246,8 +315,8 @@ function mostrarHistorial() {
 
   if (!usuarioActivo.historial || usuarioActivo.historial.length === 0) {
     historial.innerHTML = `
-      <li style='text-align: center; color: #999; padding: 30px;'>
-        <span style='font-size: 2em;'>📋</span><br>
+      <li style="text-align: center; color: #999; padding: 30px; background: transparent; border: none;">
+        <span style="font-size: 2em;">📋</span><br>
         Aún no has realizado canjes
       </li>
     `;
@@ -261,8 +330,8 @@ function mostrarHistorial() {
       li.textContent = item;
     } else {
       li.innerHTML = `
-        <strong>${item.producto}</strong><br>
-        <span style="font-size: 0.85em; color: #666;">
+        <strong>${item.producto}</strong>
+        <span>
           ${item.costo} puntos • ${item.tienda} • ${item.fecha}
         </span>
       `;
@@ -331,6 +400,9 @@ function configurarFormularioProductos(usuarioActivo) {
     
     const nombre = document.getElementById("nombreProd").value.trim();
     const costo = document.getElementById("costoProd").value.trim();
+    const precioDolar = document.getElementById("precioDolarProd")?.value.trim() || null;
+    const descripcion = document.getElementById("descripcionProd")?.value.trim() || null;
+    const imagen = document.getElementById("imagenProd")?.value.trim() || null;
     const submitBtn = formProducto.querySelector('button[type="submit"]');
 
     (async () => {
@@ -338,7 +410,14 @@ function configurarFormularioProductos(usuarioActivo) {
       submitBtn.textContent = 'Agregando...';
 
       try {
-        const resultado = await ProductService.agregarProducto(usuarioActivo.email, nombre, costo);
+        const resultado = await ProductService.agregarProducto(
+          usuarioActivo.email, 
+          nombre, 
+          costo, 
+          precioDolar, 
+          descripcion, 
+          imagen
+        );
 
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto agregado correctamente', 'success');
@@ -378,12 +457,19 @@ function mostrarProductosTienda(tiendaEmail) {
 
   productos.forEach(producto => {
     const li = document.createElement("li");
-    li.innerHTML = `
-      <div>
-        <strong>${producto.nombre}</strong><br>
-        <span style="font-size: 0.85em; color: #0ea5e9; font-weight: 600;">${producto.costo} puntos</span>
-      </div>
-    `;
+    let contenido = `<div><strong>${producto.nombre}</strong>`;
+    
+    if (producto.descripcion) {
+      contenido += `<br><span style="font-size: 0.85em; color: #666;">${producto.descripcion}</span>`;
+    }
+    
+    if (producto.precioDolar) {
+      contenido += `<br><span style="font-size: 0.9em; color: #059669;">$${parseFloat(producto.precioDolar).toFixed(2)}</span>`;
+    }
+    
+    contenido += `<br><span style="font-size: 0.85em; color: #0ea5e9; font-weight: 600;">${producto.costo} puntos</span></div>`;
+    
+    li.innerHTML = contenido;
     lista.appendChild(li);
   });
 }

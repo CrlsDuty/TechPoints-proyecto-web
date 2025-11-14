@@ -28,8 +28,19 @@
   <form id="formProducto">
     <label for="nombreProd">Nombre del producto:</label>
     <input type="text" id="nombreProd" required>
+    
     <label for="costoProd">Costo en puntos:</label>
-    <input type="number" id="costoProd" required>
+    <input type="number" id="costoProd" required min="1">
+    
+    <label for="precioDolarProd">Precio en dólares (opcional):</label>
+    <input type="number" id="precioDolarProd" step="0.01" min="0">
+    
+    <label for="descripcionProd">Descripción (opcional):</label>
+    <textarea id="descripcionProd" rows="3" maxlength="200" placeholder="Describe brevemente el producto..."></textarea>
+    
+    <label for="imagenProd">URL de imagen (opcional):</label>
+    <input type="url" id="imagenProd" placeholder="https://ejemplo.com/imagen.jpg">
+    
     <button type="submit">Agregar producto</button>
   </form>
   

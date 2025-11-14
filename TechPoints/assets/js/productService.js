@@ -14,7 +14,7 @@ const ProductService = {
   },
 
   // Agregar nuevo producto
-  agregarProducto(tiendaEmail, nombre, costo) {
+  agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null) {
     // Retorna una Promise para demostrar operaciones asíncronas
     return new Promise(async (resolve) => {
       // Simular delay
@@ -34,7 +34,10 @@ const ProductService = {
         id: Date.now(), // ID único basado en timestamp
         tienda: tiendaEmail,
         nombre: nombre.trim(),
-        costo: parseInt(costo)
+        costo: parseInt(costo),
+        precioDolar: precioDolar ? parseFloat(precioDolar) : null,
+        descripcion: descripcion ? descripcion.trim() : null,
+        imagen: imagen ? imagen.trim() : null
       };
 
       productos.push(nuevoProducto);
