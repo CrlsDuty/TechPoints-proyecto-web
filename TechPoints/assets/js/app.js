@@ -104,6 +104,17 @@ function inicializarLogin(formLogin) {
 
 // ========== REGISTRO ==========
 function inicializarRegistro(formRegistro) {
+  // Mostrar/ocultar campos de tienda según el rol seleccionado
+  const roleSelect = document.getElementById("role");
+  const storeFields = document.getElementById("storeFields");
+  if (roleSelect && storeFields) {
+    const toggleStoreFields = () => {
+      storeFields.style.display = roleSelect.value === 'tienda' ? 'block' : 'none';
+    };
+    roleSelect.addEventListener('change', toggleStoreFields);
+    toggleStoreFields();
+  }
+
   formRegistro.addEventListener("submit", e => {
     e.preventDefault();
 
@@ -112,10 +123,77 @@ function inicializarRegistro(formRegistro) {
     const role = document.getElementById("role").value;
     const submitBtn = formRegistro.querySelector('button[type="submit"]');
 
-    // Validación del rol
+    // Recopilar información adicional si es tienda
+    const tiendaInfo = role === 'tienda' ? {
+      nombre: document.getElementById("nombreTienda")?.value.trim() || '',
+      direccion: document.getElementById("direccionTienda")?.value.trim() || '',
+      telefono: document.getElementById("telefonoTienda")?.value.trim() || '',
+      horario: document.getElementById("horarioTienda")?.value.trim() || '',
+      responsable: document.getElementById("responsableTienda")?.value.trim() || ''
+    } : null;
+
+    // --- Validaciones ---
+    const inputEmail = document.getElementById('email');
+    const inputPassword = document.getElementById('password');
+    const inputNombreTienda = document.getElementById('nombreTienda');
+    const inputTelefonoTienda = document.getElementById('telefonoTienda');
+    const errNombre = document.getElementById('err-nombreTienda');
+    const errTelefono = document.getElementById('err-telefonoTienda');
+
+    const setFieldError = (inputEl, msgEl, message) => {
+      if (inputEl) inputEl.classList.add('input-error');
+      if (msgEl) msgEl.textContent = message;
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(message, 'warning');
+    };
+
+    const clearFieldError = (inputEl, msgEl) => {
+      if (inputEl) inputEl.classList.remove('input-error');
+      if (msgEl) msgEl.textContent = '';
+    };
+
+    // limpiar errores al escribir
+    [inputEmail, inputPassword, inputNombreTienda, inputTelefonoTienda].forEach(el => {
+      if (!el) return;
+      el.addEventListener('input', () => clearFieldError(el, document.getElementById('err-' + el.id)));
+    });
+
+    // Validar rol
     if (!role) {
       if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Por favor selecciona un tipo de cuenta', 'warning');
       return;
+    }
+
+    // Validar email
+    if (!AuthService.validarEmail(email)) {
+      setFieldError(inputEmail, null, 'Email inválido');
+      return;
+    }
+
+    // Verificar si email ya existe
+    if (AuthService.buscarUsuarioPorEmail(email)) {
+      setFieldError(inputEmail, null, 'Este correo ya está registrado');
+      return;
+    }
+
+    // Validar contraseña mínima
+    if (!password || password.length < 4) {
+      setFieldError(inputPassword, null, 'La contraseña debe tener al menos 4 caracteres');
+      return;
+    }
+
+    // Validaciones básicas para tiendas: requerir nombre y teléfono
+    if (role === 'tienda') {
+      if (!tiendaInfo.nombre) {
+        setFieldError(inputNombreTienda, errNombre, 'El nombre de la tienda es requerido');
+        (inputNombreTienda || inputEmail).focus();
+        return;
+      }
+
+      if (!tiendaInfo.telefono) {
+        setFieldError(inputTelefonoTienda, errTelefono, 'El teléfono o contacto es requerido');
+        (inputTelefonoTienda || inputNombreTienda || inputEmail).focus();
+        return;
+      }
     }
 
     submitBtn.disabled = true;
@@ -124,7 +202,7 @@ function inicializarRegistro(formRegistro) {
     // Demostración de callback (Utils.delayWithCallback)
     if (window.Utils && typeof Utils.delayWithCallback === 'function') {
       Utils.delayWithCallback(400, () => {
-        const resultado = AuthService.registrarUsuario(email, password, role);
+        const resultado = AuthService.registrarUsuario(email, password, role, tiendaInfo);
 
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message + ' Redirigiendo...', 'success');
@@ -137,7 +215,7 @@ function inicializarRegistro(formRegistro) {
       });
     } else {
       // Fallback síncrono
-      const resultado = AuthService.registrarUsuario(email, password, role);
+      const resultado = AuthService.registrarUsuario(email, password, role, tiendaInfo);
       if (resultado.success) {
         if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message + " Redirigiendo al login...", 'success');
         setTimeout(() => window.location.href = 'login.html', 1000);
@@ -202,9 +280,17 @@ function mostrarProductosDisponibles() {
   productos.forEach((producto, index) => {
     const puntosConvertidos = convertirDolaresAPuntos(producto.precioDolar || producto.costo);
     const dolares = producto.precioDolar || convertirPuntosADolares(producto.costo);
+    const sinStock = (producto.stock || 0) <= 0;
     
     const card = document.createElement("div");
     card.className = "producto-card";
+    
+    if (sinStock) {
+      card.classList.add('producto-sin-stock');
+      card.style.opacity = '0.5';
+      card.style.pointerEvents = 'none';
+    }
+    
     card.innerHTML = `
       <h3 class="producto-nombre">${producto.nombre}</h3>
       <p class="producto-tienda">Por ${producto.tienda}</p>
@@ -218,10 +304,14 @@ function mostrarProductosDisponibles() {
           <span class="valor">${puntosConvertidos} pts</span>
         </div>
       </div>
-      <button class="producto-btn">Ver Detalles</button>
+      ${sinStock ? `<div style="color: #ef4444; font-weight: 600; text-align: center; padding: 8px; background: #fee2e2; border-radius: 4px; margin-bottom: 8px;">❌ Sin Stock</div>` : ''}
+      <button class="producto-btn" ${sinStock ? 'disabled' : ''}>Ver Detalles</button>
     `;
     
-    card.onclick = () => abrirModalProducto(producto, index, puntosConvertidos, dolares);
+    if (!sinStock) {
+      card.onclick = () => abrirModalProducto(producto, index, puntosConvertidos, dolares);
+    }
+    
     contenedor.appendChild(card);
   });
 }
@@ -229,6 +319,7 @@ function mostrarProductosDisponibles() {
 function abrirModalProducto(producto, index, puntos, dolares) {
   const usuarioActivo = AuthService.obtenerUsuarioActivo();
   const modal = document.getElementById("modalProducto");
+  const sinStock = (producto.stock || 0) <= 0;
   
   // Llenar datos del modal
   document.getElementById("modalProductoNombre").textContent = producto.nombre;
@@ -244,9 +335,22 @@ function abrirModalProducto(producto, index, puntos, dolares) {
     `<img src="${producto.imagen}" alt="${producto.nombre}" style="max-width: 100%; border-radius: 6px;">` :
     `<span>Imagen no disponible</span>`;
   
+  // Mostrar estado de stock
+  const stockContainer = document.getElementById("modalProductoStock");
+  if (!stockContainer) {
+    // Si no existe, crear dinámicamente después del modal
+    console.warn('modalProductoStock container no encontrado');
+  } else {
+    if (sinStock) {
+      stockContainer.innerHTML = '<div style="color: #ef4444; font-weight: 600; background: #fee2e2; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 16px;">⚠️ Este producto no está disponible en stock</div>';
+    } else {
+      stockContainer.innerHTML = '';
+    }
+  }
+  
   // Configurar botón de canje
   const btnConfirmar = document.getElementById("btnConfirmarCanje");
-  btnConfirmar.disabled = (usuarioActivo.puntos || 0) < puntos;
+  btnConfirmar.disabled = (usuarioActivo.puntos || 0) < puntos || sinStock;
   btnConfirmar.onclick = () => confirmarCanjeDesdeModal(index, usuarioActivo.email, puntos);
   
   // Abrir modal
@@ -329,10 +433,11 @@ function mostrarHistorial() {
     if (typeof item === 'string') {
       li.textContent = item;
     } else {
+      const display = item.fechaHora ? (isNaN(new Date(item.fechaHora)) ? (item.fecha || '') : new Date(item.fechaHora).toLocaleString()) : (item.fecha || '');
       li.innerHTML = `
         <strong>${item.producto}</strong>
         <span>
-          ${item.costo} puntos • ${item.tienda} • ${item.fecha}
+          ${item.costo} puntos • ${item.tienda} • ${display}
         </span>
       `;
     }
@@ -343,25 +448,123 @@ function mostrarHistorial() {
 // ========== TIENDA ==========
 function inicializarTienda(usuarioActivo) {
   mostrarInfoTienda(usuarioActivo);
+  configurarEditarPerfil(usuarioActivo);
   configurarFormularioPuntos();
   configurarFormularioProductos(usuarioActivo);
+  mostrarHistorialTienda(usuarioActivo.email);
+  configurarHistorialEventos(usuarioActivo.email);
 }
 
 function mostrarInfoTienda(usuarioActivo) {
-  const stats = StoreService.obtenerEstadisticas(usuarioActivo.email);
-  console.log('Estadísticas de la tienda:', stats);
+  // Mostrar perfil operativo de la tienda en la interfaz
+  const perfil = document.getElementById('tiendaPerfil');
+  const tienda = usuarioActivo?.tienda || {};
+
+  if (perfil) {
+    const nombreEl = perfil.querySelector('.tienda-nombre');
+    const dirEl = perfil.querySelector('.tienda-direccion');
+    const telEl = perfil.querySelector('.tienda-telefono');
+    const horarioEl = perfil.querySelector('.tienda-horario');
+    const respEl = perfil.querySelector('.tienda-responsable');
+
+    nombreEl.textContent = tienda.nombre ? tienda.nombre : usuarioActivo.email;
+    dirEl.textContent = tienda.direccion ? '📍 ' + tienda.direccion : '';
+    telEl.textContent = tienda.telefono ? '📞 ' + tienda.telefono : '';
+    horarioEl.textContent = tienda.horario ? '⏰ Horario: ' + tienda.horario : '';
+    respEl.textContent = tienda.responsable ? '👤 Responsable: ' + tienda.responsable : '';
+  }
+
+  // También podemos mostrar estadísticas simples de la tienda si existen
+  try {
+    const stats = StoreService.obtenerEstadisticas(usuarioActivo.email);
+    if (stats) {
+      // por ahora solo logueamos; se puede extender la UI para mostrar estas métricas
+      console.log('Estadísticas de la tienda:', stats);
+    }
+  } catch (err) {
+    console.warn('No se pudieron obtener estadísticas de la tienda', err);
+  }
+}
+
+function configurarEditarPerfil(usuarioActivo) {
+  const modal = document.getElementById('modalEditarPerfil');
+  const btnEditar = document.getElementById('btnEditarPerfil');
+  const btnCancelar = document.getElementById('btnCancelarEdicion');
+  const btnGuardar = document.getElementById('btnGuardarEdicion');
+  const formEditar = document.getElementById('formEditarPerfil');
+
+  if (!modal || !btnEditar || !formEditar) return;
+
+  // Abrir modal
+  btnEditar.addEventListener('click', () => {
+    const tienda = usuarioActivo.tienda || {};
+    document.getElementById('editNombreTienda').value = tienda.nombre || '';
+    document.getElementById('editDireccionTienda').value = tienda.direccion || '';
+    document.getElementById('editTelefonoTienda').value = tienda.telefono || '';
+    document.getElementById('editHorarioTienda').value = tienda.horario || '';
+    document.getElementById('editResponsableTienda').value = tienda.responsable || '';
+    modal.classList.add('active');
+  });
+
+  // Cerrar modal
+  const cerrarModal = () => modal.classList.remove('active');
+  btnCancelar?.addEventListener('click', cerrarModal);
+  document.querySelector('#modalEditarPerfil .modal-close')?.addEventListener('click', cerrarModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) cerrarModal();
+  });
+
+  // Guardar cambios
+  btnGuardar.addEventListener('click', async () => {
+    const tiendaActualizada = {
+      nombre: document.getElementById('editNombreTienda').value.trim(),
+      direccion: document.getElementById('editDireccionTienda').value.trim(),
+      telefono: document.getElementById('editTelefonoTienda').value.trim(),
+      horario: document.getElementById('editHorarioTienda').value.trim(),
+      responsable: document.getElementById('editResponsableTienda').value.trim()
+    };
+
+    // Validación básica
+    if (!tiendaActualizada.nombre) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El nombre de la tienda es requerido', 'warning');
+      return;
+    }
+
+    if (!tiendaActualizada.telefono) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El teléfono es requerido', 'warning');
+      return;
+    }
+
+    // Actualizar usuario con nueva información de tienda
+    const usuarioActualizado = { ...usuarioActivo, tienda: tiendaActualizada };
+    AuthService.actualizarUsuario(usuarioActualizado);
+
+    // Actualizar la UI
+    mostrarInfoTienda(usuarioActualizado);
+
+    // Cerrar modal y mostrar toast
+    cerrarModal();
+    if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Perfil actualizado correctamente', 'success');
+  });
 }
 
 function configurarFormularioPuntos() {
-  const formTienda = document.getElementById("formTienda");
+  // Intenta usar el formulario del sidebar primero, sino usa el original
+  const formTienda = document.getElementById("formTiendaSidebar") || document.getElementById("formTienda");
   if (!formTienda) return;
+  
   formTienda.addEventListener("submit", async e => {
     e.preventDefault();
 
-    const clienteEmail = document.getElementById("cliente").value.trim();
-    const puntos = document.getElementById("puntos").value.trim();
+    // Ajustar IDs según si es sidebar o forma original
+    const isSidebar = !!document.getElementById("formTiendaSidebar");
+    const clienteInput = isSidebar ? document.getElementById("clienteSidebar") : document.getElementById("cliente");
+    const puntosInput = isSidebar ? document.getElementById("puntosSidebar") : document.getElementById("puntos");
+    const mensajeEl = isSidebar ? document.getElementById("mensajeSidebar") : document.getElementById("mensaje");
+
+    const clienteEmail = clienteInput.value.trim();
+    const puntos = puntosInput.value.trim();
     const submitBtn = formTienda.querySelector('button[type="submit"]');
-    const mensaje = document.getElementById("mensaje");
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Procesando...';
@@ -369,22 +572,24 @@ function configurarFormularioPuntos() {
     try {
       const resultado = await StoreService.agregarPuntosCliente(clienteEmail, puntos);
 
-      if (mensaje) {
-        mensaje.textContent = resultado.success ? '✅ ' + resultado.message : '❌ ' + resultado.message;
-        mensaje.style.color = resultado.success ? "#059669" : "#dc2626";
-        mensaje.style.background = resultado.success ? "#d1fae5" : "#fee2e2";
+      if (mensajeEl) {
+        mensajeEl.textContent = resultado.success ? '✅ ' + resultado.message : '❌ ' + resultado.message;
+        mensajeEl.style.color = resultado.success ? "#059669" : "#dc2626";
+        if (!isSidebar) {
+          mensajeEl.style.background = resultado.success ? "#d1fae5" : "#fee2e2";
+        }
       }
 
       if (resultado.success) formTienda.reset();
     } catch (err) {
       console.error('Error agregando puntos:', err);
-      if (mensaje) {
-        mensaje.textContent = '❌ Error inesperado';
-        mensaje.style.color = '#dc2626';
+      if (mensajeEl) {
+        mensajeEl.textContent = '❌ Error inesperado';
+        mensajeEl.style.color = '#dc2626';
       }
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Agregar Puntos';
+      submitBtn.textContent = isSidebar ? 'Agregar Puntos' : 'Agregar Puntos';
     }
   });
 }
@@ -403,6 +608,7 @@ function configurarFormularioProductos(usuarioActivo) {
     const precioDolar = document.getElementById("precioDolarProd")?.value.trim() || null;
     const descripcion = document.getElementById("descripcionProd")?.value.trim() || null;
     const imagen = document.getElementById("imagenProd")?.value.trim() || null;
+    const stock = document.getElementById("stockProd")?.value.trim() || "0";
     const submitBtn = formProducto.querySelector('button[type="submit"]');
 
     (async () => {
@@ -416,12 +622,14 @@ function configurarFormularioProductos(usuarioActivo) {
           costo, 
           precioDolar, 
           descripcion, 
-          imagen
+          imagen,
+          stock
         );
 
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto agregado correctamente', 'success');
           formProducto.reset();
+          document.getElementById("stockProd").value = "0";
           mostrarProductosTienda(usuarioActivo.email);
         } else {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
@@ -457,6 +665,15 @@ function mostrarProductosTienda(tiendaEmail) {
 
   productos.forEach(producto => {
     const li = document.createElement("li");
+    li.style.cursor = 'pointer';
+    li.title = 'Haz clic para editar o eliminar';
+    
+    const sinStock = (producto.stock || 0) <= 0;
+    if (sinStock) {
+      li.classList.add('producto-sin-stock');
+      li.style.opacity = '0.6';
+    }
+    
     let contenido = `<div><strong>${producto.nombre}</strong>`;
     
     if (producto.descripcion) {
@@ -467,11 +684,356 @@ function mostrarProductosTienda(tiendaEmail) {
       contenido += `<br><span style="font-size: 0.9em; color: #059669;">$${parseFloat(producto.precioDolar).toFixed(2)}</span>`;
     }
     
-    contenido += `<br><span style="font-size: 0.85em; color: #0ea5e9; font-weight: 600;">${producto.costo} puntos</span></div>`;
+    contenido += `<br><span style="font-size: 0.85em; color: #0ea5e9; font-weight: 600;">${producto.costo} puntos</span>`;
+    
+    // Mostrar stock
+    const stockText = sinStock ? `<span style="color: #ef4444; font-weight: 600;">Sin stock</span>` : `Stock: ${producto.stock}`;
+    contenido += `<br><span style="font-size: 0.8em; color: ${sinStock ? '#ef4444' : '#888'};">${stockText}</span></div>`;
     
     li.innerHTML = contenido;
+    
+    // Guardar datos del producto en data attributes
+    li.dataset.productoId = producto.id;
+    li.dataset.tienda = producto.tienda;
+    li.dataset.nombre = producto.nombre;
+    li.dataset.costo = producto.costo;
+    li.dataset.precioDolar = producto.precioDolar || '';
+    li.dataset.descripcion = producto.descripcion || '';
+    li.dataset.imagen = producto.imagen || '';
+    li.dataset.stock = producto.stock || 0;
+    
+    // Abrir modal al hacer clic
+    li.addEventListener('click', () => abrirModalProductoTienda(producto));
+    
     lista.appendChild(li);
   });
+
+  // actualizar historial de canjes para esta tienda
+  if (typeof mostrarHistorialTienda === 'function') mostrarHistorialTienda(tiendaEmail);
+}
+
+// Mostrar historial de canjes filtrado por tienda (agrega cliente y ordena por entrada reciente)
+function mostrarHistorialTienda(tiendaEmail) {
+  const lista = document.getElementById('historialCanjesTienda');
+  if (!lista) return;
+
+  lista.innerHTML = '';
+
+  const usuarios = AuthService.obtenerUsuarios();
+  const items = [];
+
+  usuarios.filter(u => u.role === 'cliente').forEach(cliente => {
+    const hist = cliente.historial || [];
+    // recorrer del más reciente al más antiguo por cliente
+    for (let i = hist.length - 1; i >= 0; i--) {
+      const entry = hist[i];
+      if (entry && entry.tienda === tiendaEmail) {
+        items.push({
+          producto: entry.producto,
+          costo: entry.costo,
+          fecha: entry.fecha,
+          fechaHora: entry.fechaHora || null,
+          cliente: cliente.email,
+          tienda: entry.tienda
+        });
+      }
+    }
+  });
+
+  // Apply filters from the UI
+  const filtros = {
+    q: document.getElementById('filtroBusqueda')?.value.trim() || '',
+    desde: document.getElementById('filtroDesde')?.value || '',
+    hasta: document.getElementById('filtroHasta')?.value || ''
+  };
+
+  const itemsFiltrados = items.filter(it => {
+    // Search filter (producto or cliente)
+    const q = filtros.q.toLowerCase();
+    if (q) {
+      const matches = (it.producto || '').toLowerCase().includes(q) || (it.cliente || '').toLowerCase().includes(q);
+      if (!matches) return false;
+    }
+
+    // Date range filter using fechaHora (ISO) if available, otherwise fall back to fecha
+    if (filtros.desde || filtros.hasta) {
+      const iso = it.fechaHora || null;
+      // If there's no ISO timestamp, skip date filtering for that entry (or try to parse 'fecha')
+      if (!iso) return false;
+
+      const entryDate = new Date(iso);
+      if (isNaN(entryDate)) return false;
+
+      if (filtros.desde) {
+        const desdeDate = new Date(filtros.desde + 'T00:00:00');
+        if (entryDate < desdeDate) return false;
+      }
+
+      if (filtros.hasta) {
+        const hastaDate = new Date(filtros.hasta + 'T23:59:59');
+        if (entryDate > hastaDate) return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (itemsFiltrados.length === 0) {
+    lista.innerHTML = `
+      <li style='text-align: center; color: #999; padding: 20px;'>
+        <span style='font-size: 1.6em;'>🕘</span><br>
+        Aún no hay canjes registrados en esta tienda
+      </li>
+    `;
+    return;
+  }
+
+  itemsFiltrados.forEach(it => {
+    const li = document.createElement('li');
+    const display = it.fechaHora ? (isNaN(new Date(it.fechaHora)) ? (it.fecha || '') : new Date(it.fechaHora).toLocaleString()) : (it.fecha || '');
+    li.innerHTML = `
+      <strong>${it.producto}</strong>
+      <div class="meta">${it.costo} pts • cliente: <strong>${it.cliente}</strong> • ${display}</div>
+    `;
+    lista.appendChild(li);
+  });
+}
+
+// Return the list of historial items (unfiltered) for a tienda
+function obtenerHistorialParaTienda(tiendaEmail) {
+  const usuarios = AuthService.obtenerUsuarios();
+  const items = [];
+
+  usuarios.filter(u => u.role === 'cliente').forEach(cliente => {
+    const hist = cliente.historial || [];
+    for (let i = hist.length - 1; i >= 0; i--) {
+      const entry = hist[i];
+      if (entry && entry.tienda === tiendaEmail) {
+        items.push({
+          producto: entry.producto,
+          costo: entry.costo,
+          fecha: entry.fecha,
+          fechaHora: entry.fechaHora || null,
+          cliente: cliente.email,
+          tienda: entry.tienda
+        });
+      }
+    }
+  });
+
+  return items;
+}
+
+// Configure event listeners for the historial filters and export button
+function configurarHistorialEventos(tiendaEmail) {
+  const inputQ = document.getElementById('filtroBusqueda');
+  const inputDesde = document.getElementById('filtroDesde');
+  const inputHasta = document.getElementById('filtroHasta');
+  const btnExport = document.getElementById('btnExportCSV');
+
+  const refrescar = () => mostrarHistorialTienda(tiendaEmail);
+
+  if (inputQ) inputQ.addEventListener('input', refrescar);
+  if (inputDesde) inputDesde.addEventListener('change', refrescar);
+  if (inputHasta) inputHasta.addEventListener('change', refrescar);
+  if (btnExport) btnExport.addEventListener('click', () => exportHistorialCSV(tiendaEmail));
+}
+
+// Export the currently filtered historial as CSV
+function exportHistorialCSV(tiendaEmail) {
+  try {
+    const allItems = obtenerHistorialParaTienda(tiendaEmail);
+    const q = document.getElementById('filtroBusqueda')?.value.trim().toLowerCase() || '';
+    const desde = document.getElementById('filtroDesde')?.value || '';
+    const hasta = document.getElementById('filtroHasta')?.value || '';
+
+    const filtered = allItems.filter(it => {
+      if (q) {
+        const matches = (it.producto || '').toLowerCase().includes(q) || (it.cliente || '').toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (desde || hasta) {
+        if (!it.fechaHora) return false;
+        const entryDate = new Date(it.fechaHora);
+        if (isNaN(entryDate)) return false;
+        if (desde) {
+          const desdeDate = new Date(desde + 'T00:00:00');
+          if (entryDate < desdeDate) return false;
+        }
+        if (hasta) {
+          const hastaDate = new Date(hasta + 'T23:59:59');
+          if (entryDate > hastaDate) return false;
+        }
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('No hay registros que exportar con los filtros actuales', 'warning');
+      return;
+    }
+
+    // Build CSV content
+    const headers = ['fechaHora','fechaLocal','producto','costo','cliente','tienda'];
+    const rows = [headers.join(',')];
+    filtered.forEach(it => {
+      const fechaISO = it.fechaHora || '';
+      const fechaLocal = it.fechaHora ? (isNaN(new Date(it.fechaHora)) ? (it.fecha || '') : new Date(it.fechaHora).toLocaleString()) : (it.fecha || '');
+      const safe = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+      rows.push([safe(fechaISO), safe(fechaLocal), safe(it.producto), safe(it.costo), safe(it.cliente), safe(it.tienda)].join(','));
+    });
+
+    const csvContent = rows.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fechaSuffix = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    a.href = url;
+    a.download = `historial_tienda_${tiendaEmail.replace(/[@.]/g,'_')}_${fechaSuffix}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('CSV exportado correctamente', 'success');
+  } catch (err) {
+    console.error('Error exportando CSV:', err);
+    if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Error al exportar CSV', 'error');
+  }
+}
+
+// ========== MODAL PRODUCTO TIENDA (EDITAR/ELIMINAR) ==========
+let productoTiendaActual = null; // Variable global para guardar el producto en edición
+
+function abrirModalProductoTienda(producto) {
+  productoTiendaActual = producto;
+  const modal = document.getElementById('modalProductoTienda');
+  
+  // Llenar formulario con datos del producto
+  document.getElementById('editProductoNombre').value = producto.nombre;
+  document.getElementById('editProductoDescripcion').value = producto.descripcion || '';
+  document.getElementById('editProductoCosto').value = producto.costo;
+  document.getElementById('editProductoStock').value = producto.stock || 0;
+  document.getElementById('editProductoPrecio').value = producto.precioDolar || '';
+  document.getElementById('editProductoImagen').value = producto.imagen || '';
+  
+  // Abrir modal
+  if (modal) modal.classList.add('active');
+  
+  // Configurar listeners (solo una vez por sesión, pero lo hacemos aquí para seguridad)
+  configurarModalProductoTienda();
+}
+
+function configurarModalProductoTienda() {
+  const modal = document.getElementById('modalProductoTienda');
+  const btnGuardar = document.getElementById('btnGuardarProducto');
+  const btnEliminar = document.getElementById('btnEliminarProducto');
+  const btnCancelar = document.getElementById('btnCancelarProducto');
+  const btnCerrar = modal?.querySelector('.modal-close');
+  
+  if (!modal) return;
+  
+  // Cerrar modal
+  const cerrarModal = () => {
+    modal.classList.remove('active');
+    productoTiendaActual = null;
+  };
+  
+  btnCerrar?.addEventListener('click', cerrarModal, { once: true });
+  btnCancelar?.addEventListener('click', cerrarModal, { once: true });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) cerrarModal();
+  }, { once: true });
+  
+  // Guardar cambios
+  if (btnGuardar) {
+    btnGuardar.onclick = async () => {
+      if (!productoTiendaActual) return;
+      
+      const nombre = document.getElementById('editProductoNombre').value.trim();
+      const costo = document.getElementById('editProductoCosto').value.trim();
+      const precioDolar = document.getElementById('editProductoPrecio').value.trim() || null;
+      const descripcion = document.getElementById('editProductoDescripcion').value.trim() || null;
+      const imagen = document.getElementById('editProductoImagen').value.trim() || null;
+      const stock = document.getElementById('editProductoStock').value.trim() || 0;
+      
+      // Validaciones
+      if (!nombre) {
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El nombre del producto es requerido', 'warning');
+        return;
+      }
+      
+      if (!costo || costo <= 0) {
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El costo debe ser mayor a 0', 'warning');
+        return;
+      }
+
+      if (stock < 0) {
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El stock no puede ser negativo', 'warning');
+        return;
+      }
+      
+      try {
+        const usuarioActivo = AuthService.obtenerUsuarioActivo();
+        const resultado = await ProductService.actualizarProducto(
+          productoTiendaActual.id,
+          usuarioActivo.email,
+          nombre,
+          costo,
+          precioDolar,
+          descripcion,
+          imagen,
+          stock
+        );
+        
+        if (resultado.success) {
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto actualizado correctamente', 'success');
+          cerrarModal();
+          mostrarProductosTienda(usuarioActivo.email);
+        } else {
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
+        }
+      } catch (err) {
+        console.error('Error actualizando producto:', err);
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Error inesperado al actualizar producto', 'error');
+      }
+    };
+  }
+  
+  // Eliminar producto
+  if (btnEliminar) {
+    btnEliminar.onclick = async () => {
+      if (!productoTiendaActual) return;
+      
+      if (!confirm(`¿Estás seguro de que deseas eliminar "${productoTiendaActual.nombre}"? Esta acción no se puede deshacer.`)) {
+        return;
+      }
+      
+      try {
+        const usuarioActivo = AuthService.obtenerUsuarioActivo();
+        const resultado = ProductService.eliminarProducto(productoTiendaActual.id, usuarioActivo.email);
+        
+        if (resultado.success) {
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto eliminado correctamente', 'success');
+          cerrarModal();
+          mostrarProductosTienda(usuarioActivo.email);
+        } else {
+          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
+        }
+      } catch (err) {
+        console.error('Error eliminando producto:', err);
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Error inesperado al eliminar producto', 'error');
+      }
+    };
+  }
+}
+
+function cerrarModalProductoTienda() {
+  const modal = document.getElementById('modalProductoTienda');
+  if (modal) {
+    modal.classList.remove('active');
+    productoTiendaActual = null;
+  }
 }
 
 // ========== LOGOUT ==========

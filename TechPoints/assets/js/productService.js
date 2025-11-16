@@ -14,7 +14,7 @@ const ProductService = {
   },
 
   // Agregar nuevo producto
-  agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null) {
+  agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = 0) {
     // Retorna una Promise para demostrar operaciones asíncronas
     return new Promise(async (resolve) => {
       // Simular delay
@@ -29,6 +29,10 @@ const ProductService = {
         return resolve({ success: false, message: "El costo debe ser mayor a 0" });
       }
 
+      if (stock < 0) {
+        return resolve({ success: false, message: "El stock no puede ser negativo" });
+      }
+
       const productos = this.obtenerProductos();
       const nuevoProducto = {
         id: Date.now(), // ID único basado en timestamp
@@ -37,7 +41,8 @@ const ProductService = {
         costo: parseInt(costo),
         precioDolar: precioDolar ? parseFloat(precioDolar) : null,
         descripcion: descripcion ? descripcion.trim() : null,
-        imagen: imagen ? imagen.trim() : null
+        imagen: imagen ? imagen.trim() : null,
+        stock: parseInt(stock) || 0
       };
 
       productos.push(nuevoProducto);
@@ -86,21 +91,40 @@ const ProductService = {
       // Realizar canje
       cliente.puntos -= producto.costo;
       cliente.historial = cliente.historial || [];
+      // Añadir registro con fecha y timestamp ISO para trazabilidad
+      const now = new Date();
       cliente.historial.push({
         producto: producto.nombre,
         costo: producto.costo,
-        fecha: new Date().toLocaleDateString(),
+        fecha: now.toLocaleDateString(),
+        fechaHora: now.toISOString(),
         tienda: producto.tienda
       });
 
-      // Actualizar cliente
-      const resultado = AuthService.actualizarUsuario(cliente);
+      // Verificar stock disponible
+      if ((producto.stock || 0) <= 0) {
+        return resolve({ 
+          success: false, 
+          message: "Este producto no está disponible en stock",
+          sinStock: true
+        });
+      }
 
-      if (resultado.success) {
+      // Actualizar cliente
+      const resultadoCliente = AuthService.actualizarUsuario(cliente);
+
+      // Decrementar stock del producto
+      producto.stock = (producto.stock || 1) - 1;
+
+      // Guardar producto con stock actualizado
+      this.guardarProductos(productos);
+
+      if (resultadoCliente.success) {
         return resolve({ 
           success: true, 
-          message: `\u00a1Canje exitoso! Has canjeado ${producto.nombre}`,
-          cliente
+          message: `¡Canje exitoso! Has canjeado ${producto.nombre}`,
+          cliente,
+          stockRestante: producto.stock
         });
       }
 
@@ -121,6 +145,48 @@ const ProductService = {
     this.guardarProductos(productos);
 
     return { success: true, message: "Producto eliminado" };
+  },
+
+  // Actualizar producto (editar detalles incluyendo stock)
+  actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = null) {
+    return new Promise(async (resolve) => {
+      if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(200);
+
+      let productos = this.obtenerProductos();
+      const index = productos.findIndex(p => p.id === productoId && p.tienda === tiendaEmail);
+      
+      if (index === -1) {
+        return resolve({ success: false, message: "Producto no encontrado o no autorizado" });
+      }
+
+      // Validaciones
+      if (!nombre || !costo) {
+        return resolve({ success: false, message: "Nombre y costo son requeridos" });
+      }
+
+      if (costo <= 0) {
+        return resolve({ success: false, message: "El costo debe ser mayor a 0" });
+      }
+
+      if (stock !== null && stock < 0) {
+        return resolve({ success: false, message: "El stock no puede ser negativo" });
+      }
+
+      // Actualizar producto
+      productos[index] = {
+        ...productos[index],
+        nombre: nombre.trim(),
+        costo: parseInt(costo),
+        precioDolar: precioDolar ? parseFloat(precioDolar) : null,
+        descripcion: descripcion ? descripcion.trim() : null,
+        imagen: imagen ? imagen.trim() : null,
+        stock: stock !== null ? parseInt(stock) : (productos[index].stock || 0)
+      };
+
+      this.guardarProductos(productos);
+
+      return resolve({ success: true, producto: productos[index], message: "Producto actualizado correctamente" });
+    });
   }
 };
 

@@ -612,6 +612,81 @@ html {
   line-height: 1.5;
 }
 
+/* ========== PERFIL DE TIENDA (UI) ========== */
+.tienda-profile {
+  background: #ffffff;
+  border: 1px solid #e6eef6;
+  padding: 18px 20px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+}
+
+.tienda-profile h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.15em;
+}
+
+.tienda-profile-body p {
+  margin: 6px 0;
+  color: #374151;
+  font-size: 0.98em;
+}
+
+.tienda-profile .tienda-nombre {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1.05em;
+}
+
+.tienda-profile .tienda-direccion {
+  color: #475569;
+}
+
+.tienda-profile .tienda-telefono {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.tienda-profile .tienda-horario,
+.tienda-profile .tienda-responsable {
+  color: #374151;
+  font-size: 0.95em;
+}
+
+.btn-editar-perfil {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-editar-perfil:hover {
+  background: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btn-editar-perfil:active {
+  transform: scale(0.98);
+}
+
+/* ========== ESTILOS DE VALIDACIÓN (REGISTRO) ========== */
+.input-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.06) !important;
+}
+
+.field-error {
+  color: #ef4444;
+  font-size: 0.85em;
+  margin-top: 6px;
+  display: block;
+}
+
 .toast-success {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
@@ -738,6 +813,23 @@ html {
   overflow: hidden;
 }
 
+.producto-card.producto-sin-stock {
+  background: #f9f9f9;
+  border-color: #d0d0d0;
+  cursor: not-allowed;
+}
+
+.producto-card.producto-sin-stock::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
 .producto-card::before {
   content: '';
   position: absolute;
@@ -754,6 +846,12 @@ html {
   transform: translateY(-4px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
   border-color: #0ea5e9;
+}
+
+.producto-card.producto-sin-stock:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: #d0d0d0;
 }
 
 .producto-card:hover::before {
@@ -1168,5 +1266,458 @@ html {
 
   .modal-footer {
     padding: 16px;
+  }
+}
+
+/* ========== LAYOUT TIENDA (SIDEBAR + MAIN) ========== */
+.tienda-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.tienda-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+
+.tienda-header {
+  padding: 16px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: white;
+  border-radius: 8px;
+}
+
+.tienda-header h1 {
+  margin: 0;
+  font-size: 1.4em;
+  color: white;
+}
+
+.tienda-profile {
+  background: white;
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tienda-profile h2 {
+  margin: 0 0 12px 0;
+  font-size: 1.1em;
+  color: #1a1a1a;
+}
+
+.tienda-profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tienda-profile-body p {
+  margin: 0;
+  color: #374151;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.tienda-profile .tienda-nombre {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1.05em;
+}
+
+.tienda-profile .tienda-direccion {
+  color: #475569;
+}
+
+.tienda-profile .tienda-telefono {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.tienda-profile .tienda-horario,
+.tienda-profile .tienda-responsable {
+  color: #374151;
+  font-size: 0.95em;
+}
+
+.btn-editar-perfil {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-editar-perfil:hover {
+  background: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.tienda-actions {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.tienda-actions h3 {
+  margin: 0 0 12px 0;
+  font-size: 1em;
+  color: #1a1a1a;
+}
+
+.form-compacto {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.form-compacto label {
+  font-size: 0.85em;
+  color: #374151;
+  margin-bottom: -6px;
+}
+
+.form-compacto input {
+  padding: 8px 12px;
+  font-size: 0.95em;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+}
+
+.form-compacto button {
+  padding: 10px 14px;
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
+.mensaje-compacto {
+  margin: 8px 0 0 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  display: none;
+}
+
+.mensaje-compacto:not(:empty) {
+  display: block;
+}
+
+.btn-logout {
+  background: white;
+  color: #1a1a1a;
+  border: 1px solid #d0d0d0;
+  padding: 12px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95em;
+  width: 100%;
+  transition: all 0.2s;
+  margin-top: auto;
+}
+
+.btn-logout:hover {
+  background: #f5f5f5;
+  border-color: #1a1a1a;
+}
+
+/* ========== TIENDA MAIN ========== */
+.tienda-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.tienda-section {
+  background: white;
+  border: 1px solid #e0e0e0;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tienda-section h2 {
+  margin: 0 0 16px 0;
+  font-size: 1.2em;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ========== FORMULARIO DE PRODUCTO ========== */
+.form-producto {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.form-col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.form-col label {
+  font-size: 0.9em;
+  color: #374151;
+  font-weight: 500;
+}
+
+.form-col input,
+.form-col textarea {
+  padding: 10px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 0.95em;
+  font-family: inherit;
+}
+
+.form-col input:focus,
+.form-col textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-producto button {
+  padding: 12px 16px;
+  margin-top: 8px;
+  font-size: 0.95em;
+}
+
+/* ========== LISTA DE PRODUCTOS TIENDA ========== */
+.productos-tienda-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.productos-tienda-list ul {
+  display: contents;
+}
+
+.productos-tienda-list li {
+  background: #f8fafc;
+  border: 1px solid #e0e0e0;
+  padding: 12px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-template-columns: none;
+  grid-column: auto;
+  text-align: left;
+}
+
+.productos-tienda-list li:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.productos-tienda-list li strong {
+  color: #1a1a1a;
+  font-size: 0.95em;
+}
+
+.productos-tienda-list li span {
+  color: #666;
+  font-size: 0.85em;
+}
+
+/* Historial de canjes en la vista de tienda */
+.historial-tienda-list {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.historial-tienda-list ul {
+  display: contents;
+}
+
+.historial-tienda-list li {
+  background: #fff7ed;
+  border: 1px solid #f6d6a8;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 0.95em;
+}
+
+.historial-tienda-list li .meta {
+  color: #6b7280;
+  font-size: 0.85em;
+}
+
+/* Controles de filtrado del historial */
+.historial-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 2px solid #e0e0e0;
+  margin-bottom: 16px;
+}
+
+.historial-controls input[type="search"],
+.historial-controls input[type="date"] {
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: 1px solid #d0d0d0;
+  font-size: 0.9em;
+  background: white;
+  color: #1a1a1a;
+  transition: all 0.2s;
+  min-width: 140px;
+}
+
+.historial-controls input[type="search"]:focus,
+.historial-controls input[type="date"]:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  background: #f0f9ff;
+}
+
+.historial-controls input[type="search"]::placeholder {
+  color: #999;
+}
+
+.historial-controls #btnExportCSV {
+  padding: 9px 18px;
+  font-size: 0.9em;
+  font-weight: 600;
+  background: #0ea5e9;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.historial-controls #btnExportCSV:hover {
+  background: #0284c7;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  transform: translateY(-1px);
+}
+
+.historial-controls #btnExportCSV:active {
+  transform: translateY(0);
+}
+
+.historial-controls #btnExportCSV:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ========== RESPONSIVE TIENDA ========== */
+@media (max-width: 1024px) {
+  .tienda-layout {
+    grid-template-columns: 280px 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .productos-tienda-list {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .tienda-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .tienda-sidebar {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
+
+  .productos-tienda-list {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    max-height: none;
+  }
+
+  .tienda-section {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tienda-layout {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .tienda-sidebar {
+    gap: 12px;
+  }
+
+  .tienda-main {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .tienda-header h1 {
+    font-size: 1.2em;
+  }
+
+  .tienda-section h2 {
+    font-size: 1em;
+  }
+
+  .productos-tienda-list {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
   }
 }

@@ -23,6 +23,25 @@
       <option value="cliente">Cliente</option>
       <option value="tienda">Tienda</option>
     </select>
+    <div id="storeFields" style="display: none; margin-top: 12px;">
+      <h3>Información de la Tienda</h3>
+      <label for="nombreTienda">Nombre de la tienda:</label>
+      <input type="text" id="nombreTienda" placeholder="Nombre comercial">
+      <span class="field-error" id="err-nombreTienda" aria-live="polite"></span>
+
+      <label for="direccionTienda">Dirección (si es física):</label>
+      <input type="text" id="direccionTienda" placeholder="Calle, número, ciudad">
+
+      <label for="telefonoTienda">Datos de contacto:</label>
+      <input type="text" id="telefonoTienda" placeholder="Teléfono o WhatsApp">
+      <span class="field-error" id="err-telefonoTienda" aria-live="polite"></span>
+
+      <label for="horarioTienda">Horario de atención:</label>
+      <input type="text" id="horarioTienda" placeholder="Ej: Lun-Vie 9:00-18:00">
+
+      <label for="responsableTienda">Persona responsable:</label>
+      <input type="text" id="responsableTienda" placeholder="Nombre del encargado">
+    </div>
     <button type="submit">Registrarse</button>
   </form>
   <p>¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a></p>

@@ -8,7 +8,18 @@ const AuthService = {
     if (usuarios.length === 0) {
       const usuariosIniciales = [
         { email: "ana@mail.com", password: "1234", role: "cliente", puntos: 50 },
-        { email: "tienda@mail.com", password: "admin", role: "tienda" }
+        { 
+          email: "tienda@mail.com", 
+          password: "admin", 
+          role: "tienda",
+          tienda: {
+            nombre: "Demo Store",
+            direccion: "Av. Demo 123",
+            telefono: "+56 9 0000 0000",
+            horario: "Lun-Vie 9:00-18:00",
+            responsable: "Administrador"
+          }
+        }
       ];
       this.guardarUsuarios(usuariosIniciales);
     }
@@ -31,7 +42,7 @@ const AuthService = {
   },
 
   // Registrar nuevo usuario
-  registrarUsuario(email, password, role) {
+  registrarUsuario(email, password, role, tiendaInfo = null) {
     // Validaciones
     if (!email || !password || !role) {
       return { success: false, message: "Todos los campos son requeridos" };
@@ -57,6 +68,11 @@ const AuthService = {
     if (role === "cliente") {
       nuevoUsuario.puntos = 0;
       nuevoUsuario.historial = [];
+    }
+
+    // Si es tienda, guardar la información adicional (si se entregó)
+    if (role === "tienda") {
+      nuevoUsuario.tienda = tiendaInfo || {};
     }
 
     usuarios.push(nuevoUsuario);

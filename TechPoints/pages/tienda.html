@@ -12,41 +12,192 @@
   <script defer src="../assets/js/app.js"></script>
 </head>
 <body>
-  <h1>Zona Tienda</h1>
-  
-  <h2>Agregar puntos a clientes</h2>
-  <form id="formTienda">
-    <label for="cliente">Correo del cliente:</label>
-    <input type="email" id="cliente" required>
-    <label for="puntos">Puntos a agregar:</label>
-    <input type="number" id="puntos" required>
-    <button type="submit">Agregar puntos</button>
-  </form>
-  <p id="mensaje"></p>
+  <div class="tienda-layout">
+    <!-- SIDEBAR IZQUIERDA: Perfil y acciones rápidas -->
+    <aside class="tienda-sidebar">
+      <!-- Encabezado -->
+      <div class="tienda-header">
+        <h1>Zona Tienda</h1>
+      </div>
 
-  <h2>Administrar productos</h2>
-  <form id="formProducto">
-    <label for="nombreProd">Nombre del producto:</label>
-    <input type="text" id="nombreProd" required>
-    
-    <label for="costoProd">Costo en puntos:</label>
-    <input type="number" id="costoProd" required min="1">
-    
-    <label for="precioDolarProd">Precio en dólares (opcional):</label>
-    <input type="number" id="precioDolarProd" step="0.01" min="0">
-    
-    <label for="descripcionProd">Descripción (opcional):</label>
-    <textarea id="descripcionProd" rows="3" maxlength="200" placeholder="Describe brevemente el producto..."></textarea>
-    
-    <label for="imagenProd">URL de imagen (opcional):</label>
-    <input type="url" id="imagenProd" placeholder="https://ejemplo.com/imagen.jpg">
-    
-    <button type="submit">Agregar producto</button>
-  </form>
-  
-  <h3>Mis productos</h3>
-  <ul id="listaProductos"></ul>
+      <!-- Perfil operativo de la tienda -->
+      <section id="tiendaPerfil" class="tienda-profile" aria-live="polite">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+          <h2 style="margin: 0;">Perfil</h2>
+          <button id="btnEditarPerfil" type="button" class="btn-editar-perfil">✏️</button>
+        </div>
+        <div class="tienda-profile-body">
+          <p class="tienda-nombre">Cargando...</p>
+          <p class="tienda-direccion"></p>
+          <p class="tienda-telefono"></p>
+          <p class="tienda-horario"></p>
+          <p class="tienda-responsable"></p>
+        </div>
+      </section>
 
-  <button onclick="logout()">Cerrar sesión</button>
+      <!-- Acciones rápidas -->
+      <section class="tienda-actions">
+        <h3>Acciones Rápidas</h3>
+        <form id="formTiendaSidebar" class="form-compacto">
+          <label for="clienteSidebar">Email del cliente:</label>
+          <input type="email" id="clienteSidebar" placeholder="ana@mail.com">
+          <label for="puntosSidebar">Puntos:</label>
+          <input type="number" id="puntosSidebar" placeholder="50" min="1">
+          <button type="submit" class="btn-secondary">Agregar Puntos</button>
+        </form>
+        <p id="mensajeSidebar" class="mensaje-compacto"></p>
+      </section>
+
+      <!-- Botón de cierre sesión -->
+      <button onclick="logout()" class="btn-logout">🚪 Cerrar sesión</button>
+    </aside>
+
+    <!-- MAIN: Contenido principal -->
+    <main class="tienda-main">
+      <!-- Formulario de producto -->
+      <section class="tienda-section">
+        <h2>📦 Agregar Producto</h2>
+        <form id="formProducto" class="form-producto">
+          <div class="form-row">
+            <div class="form-col">
+              <label for="nombreProd">Nombre del producto:</label>
+              <input type="text" id="nombreProd" required>
+            </div>
+            <div class="form-col">
+              <label for="costoProd">Costo en puntos:</label>
+              <input type="number" id="costoProd" required min="1">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-col">
+              <label for="precioDolarProd">Precio en dólares:</label>
+              <input type="number" id="precioDolarProd" step="0.01" min="0">
+            </div>
+            <div class="form-col">
+              <label for="stockProd">Stock disponible:</label>
+              <input type="number" id="stockProd" min="0" value="0">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-col">
+              <label for="imagenProd">URL de imagen:</label>
+              <input type="url" id="imagenProd">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-col" style="grid-column: 1 / -1;">
+              <label for="descripcionProd">Descripción:</label>
+              <textarea id="descripcionProd" rows="3" maxlength="200" placeholder="Describe brevemente el producto..."></textarea>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary">➕ Agregar Producto</button>
+        </form>
+      </section>
+
+      <!-- Lista de productos -->
+      <section class="tienda-section">
+        <h2>📋 Mis Productos</h2>
+        <div class="productos-tienda-list">
+          <ul id="listaProductos"></ul>
+        </div>
+      </section>
+
+      <!-- Historial de canjes de la tienda -->
+      <section class="tienda-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <h2>🕘 Historial de Canjes</h2>
+          <div class="historial-controls" style="display:flex; gap:8px; align-items:center;">
+            <input id="filtroBusqueda" type="search" placeholder="Buscar producto o cliente" style="padding:8px 10px; border-radius:6px; border:1px solid #d0d0d0;">
+            <input id="filtroDesde" type="date" title="Desde" style="padding:8px 10px; border-radius:6px; border:1px solid #d0d0d0;">
+            <input id="filtroHasta" type="date" title="Hasta" style="padding:8px 10px; border-radius:6px; border:1px solid #d0d0d0;">
+            <button id="btnExportCSV" class="btn-secondary" type="button">Exportar CSV</button>
+          </div>
+        </div>
+        <div class="historial-tienda-list">
+          <ul id="historialCanjesTienda"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal de edición de perfil -->
+  <div id="modalEditarPerfil" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      <div class="modal-header">
+        <h2>Editar Perfil de la Tienda</h2>
+      </div>
+      <form id="formEditarPerfil" class="modal-body" style="display: block;">
+        <label for="editNombreTienda">Nombre de la tienda:</label>
+        <input type="text" id="editNombreTienda" required>
+        
+        <label for="editDireccionTienda">Dirección (si es física):</label>
+        <input type="text" id="editDireccionTienda">
+        
+        <label for="editTelefonoTienda">Datos de contacto:</label>
+        <input type="text" id="editTelefonoTienda" required>
+        
+        <label for="editHorarioTienda">Horario de atención:</label>
+        <input type="text" id="editHorarioTienda">
+        
+        <label for="editResponsableTienda">Persona responsable:</label>
+        <input type="text" id="editResponsableTienda">
+      </form>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="btnCancelarEdicion">Cancelar</button>
+        <button type="button" class="btn-primary" id="btnGuardarEdicion">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de edición/eliminación de producto -->
+  <div id="modalProductoTienda" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      <div class="modal-header">
+        <h2>Editar Producto</h2>
+      </div>
+      <div class="modal-body" style="display: block; grid-template-columns: 1fr;">
+        <div id="productoTiendaInfo" style="display: flex; flex-direction: column; gap: 12px;">
+          <div>
+            <strong>Nombre:</strong>
+            <input type="text" id="editProductoNombre" style="width: 100%; margin-top: 4px;">
+          </div>
+          <div>
+            <strong>Descripción:</strong>
+            <textarea id="editProductoDescripcion" rows="3" style="width: 100%; margin-top: 4px;"></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <strong>Costo (puntos):</strong>
+              <input type="number" id="editProductoCosto" min="1" style="width: 100%; margin-top: 4px;">
+            </div>
+            <div>
+              <strong>Stock:</strong>
+              <input type="number" id="editProductoStock" min="0" style="width: 100%; margin-top: 4px;">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <strong>Precio ($):</strong>
+              <input type="number" id="editProductoPrecio" step="0.01" min="0" style="width: 100%; margin-top: 4px;">
+            </div>
+          <div>
+            <strong>URL de Imagen:</strong>
+            <input type="url" id="editProductoImagen" style="width: 100%; margin-top: 4px;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="btnCancelarProducto">Cancelar</button>
+        <button type="button" class="btn-secondary" id="btnEliminarProducto" style="background: #ef4444; color: white; border: none;">🗑️ Eliminar</button>
+        <button type="button" class="btn-primary" id="btnGuardarProducto">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
