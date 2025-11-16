@@ -86,8 +86,11 @@
 
           <div class="form-row">
             <div class="form-col">
-              <label for="imagenProd">URL de imagen:</label>
-              <input type="url" id="imagenProd">
+              <label for="imagenProd">URL de imagen o subir archivo:</label>
+              <input type="url" id="imagenProd" placeholder="https://...">
+              <input type="file" id="imagenProdFile" accept="image/*" style="margin-top:8px;">
+              <div id="imagenProdPreview" style="margin-top:8px;"></div>
+              <button type="button" id="imagenProdClear" class="btn-secondary" style="margin-top:6px; display:none;">Limpiar imagen</button>
             </div>
           </div>
 
@@ -191,8 +194,11 @@
               <input type="number" id="editProductoPrecio" step="0.01" min="0" style="width: 100%; margin-top: 4px;">
             </div>
           <div>
-            <strong>URL de Imagen:</strong>
+            <strong>URL de Imagen o subir archivo:</strong>
             <input type="url" id="editProductoImagen" style="width: 100%; margin-top: 4px;">
+            <input type="file" id="editProductoImagenFile" accept="image/*" style="margin-top:6px;">
+            <div id="editProductoImagenPreview" style="margin-top:8px;"></div>
+            <button type="button" id="editProductoImagenClear" class="btn-secondary" style="margin-top:6px; display:none;">Limpiar imagen</button>
           </div>
         </div>
       </div>

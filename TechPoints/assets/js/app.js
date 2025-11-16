@@ -604,6 +604,67 @@ function configurarFormularioProductos(usuarioActivo) {
 
   mostrarProductosTienda(usuarioActivo.email);
 
+  // Imagen: permitir URL o subir archivo (dataURL)
+  const imagenProdInput = document.getElementById('imagenProd');
+  const imagenProdFile = document.getElementById('imagenProdFile');
+  const imagenProdPreview = document.getElementById('imagenProdPreview');
+  const imagenProdClear = document.getElementById('imagenProdClear');
+
+  const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
+
+  function mostrarPreviewElemento(container, src) {
+    if (!container) return;
+    if (!src) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = `<img src="${src}" alt="Preview imagen" style="max-width: 180px; max-height: 120px; border-radius:6px; display:block;">`;
+  }
+
+  // Si el usuario escribe una URL, mostrar preview
+  imagenProdInput?.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (val) {
+      mostrarPreviewElemento(imagenProdPreview, val);
+      imagenProdClear && (imagenProdClear.style.display = 'inline-block');
+    } else {
+      mostrarPreviewElemento(imagenProdPreview, '');
+      imagenProdClear && (imagenProdClear.style.display = 'none');
+    }
+  });
+
+  // Si selecciona archivo, leer como dataURL y poner en input URL
+  imagenProdFile?.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Tipo de archivo no soportado. Selecciona una imagen.', 'warning');
+      imagenProdFile.value = '';
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Imagen demasiado grande (máx 2MB).', 'warning');
+      imagenProdFile.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const dataUrl = evt.target.result;
+      // setear en campo URL para mantener compatibilidad
+      if (imagenProdInput) imagenProdInput.value = dataUrl;
+      mostrarPreviewElemento(imagenProdPreview, dataUrl);
+      imagenProdClear && (imagenProdClear.style.display = 'inline-block');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  imagenProdClear?.addEventListener('click', () => {
+    if (imagenProdInput) imagenProdInput.value = '';
+    if (imagenProdFile) imagenProdFile.value = '';
+    mostrarPreviewElemento(imagenProdPreview, '');
+    imagenProdClear.style.display = 'none';
+  });
+
   formProducto.addEventListener("submit", e => {
     e.preventDefault();
     
@@ -920,6 +981,19 @@ function abrirModalProductoTienda(producto) {
   document.getElementById('editProductoStock').value = producto.stock || 0;
   document.getElementById('editProductoPrecio').value = producto.precioDolar || '';
   document.getElementById('editProductoImagen').value = producto.imagen || '';
+  // Mostrar preview en modal de edición
+  const editImgInput = document.getElementById('editProductoImagen');
+  const editImgFile = document.getElementById('editProductoImagenFile');
+  const editImgPreview = document.getElementById('editProductoImagenPreview');
+  const editImgClear = document.getElementById('editProductoImagenClear');
+  if (editImgFile) editImgFile.value = '';
+  if (producto.imagen) {
+    if (editImgPreview) editImgPreview.innerHTML = `<img src="${producto.imagen}" alt="Preview" style="max-width:180px; max-height:120px; border-radius:6px; display:block;">`;
+    if (editImgClear) editImgClear.style.display = 'inline-block';
+  } else {
+    if (editImgPreview) editImgPreview.innerHTML = '';
+    if (editImgClear) editImgClear.style.display = 'none';
+  }
   
   // Abrir modal
   if (modal) modal.classList.add('active');
@@ -948,6 +1022,55 @@ function configurarModalProductoTienda() {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) cerrarModal();
   }, { once: true });
+
+  // Manejo de imagen en modal: URL o archivo
+  const editImgInputField = document.getElementById('editProductoImagen');
+  const editImgFileInput = document.getElementById('editProductoImagenFile');
+  const editImgPreviewEl = document.getElementById('editProductoImagenPreview');
+  const editImgClearBtn = document.getElementById('editProductoImagenClear');
+
+  // Si se escribe una URL, mostrar preview
+  editImgInputField?.addEventListener('input', (ev) => {
+    const val = ev.target.value.trim();
+    if (val) {
+      editImgPreviewEl && (editImgPreviewEl.innerHTML = `<img src="${val}" alt="Preview" style="max-width:180px; max-height:120px; border-radius:6px; display:block;">`);
+      if (editImgClearBtn) editImgClearBtn.style.display = 'inline-block';
+    } else {
+      editImgPreviewEl && (editImgPreviewEl.innerHTML = '');
+      if (editImgClearBtn) editImgClearBtn.style.display = 'none';
+    }
+  });
+
+  // Si se selecciona archivo, leer y convertir a dataURL
+  editImgFileInput?.addEventListener('change', (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Tipo de archivo no soportado. Selecciona una imagen.', 'warning');
+      editImgFileInput.value = '';
+      return;
+    }
+    if (file.size > (2 * 1024 * 1024)) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Imagen demasiado grande (máx 2MB).', 'warning');
+      editImgFileInput.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const dataUrl = evt.target.result;
+      if (editImgInputField) editImgInputField.value = dataUrl;
+      editImgPreviewEl && (editImgPreviewEl.innerHTML = `<img src="${dataUrl}" alt="Preview" style="max-width:180px; max-height:120px; border-radius:6px; display:block;">`);
+      if (editImgClearBtn) editImgClearBtn.style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  editImgClearBtn?.addEventListener('click', () => {
+    if (editImgInputField) editImgInputField.value = '';
+    if (editImgFileInput) editImgFileInput.value = '';
+    if (editImgPreviewEl) editImgPreviewEl.innerHTML = '';
+    if (editImgClearBtn) editImgClearBtn.style.display = 'none';
+  });
   
   // Guardar cambios
   if (btnGuardar) {
