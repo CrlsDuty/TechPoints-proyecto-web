@@ -17,11 +17,20 @@
 </head>
 <body>
   <h1>Registro de Usuario</h1>
+  <div id="formError" style="color: #d32f2f; margin-bottom: 12px; display: none;" role="alert"></div>
   <form id="formRegistro">
     <label for="email">Correo:</label>
     <input type="email" id="email" required>
+    <span class="field-error" id="err-email" aria-live="polite"></span>
+
     <label for="password">Contraseña:</label>
     <input type="password" id="password" required>
+    <div id="passwordStrength" style="margin: 8px 0;"></div>
+    <span class="field-error" id="err-password" aria-live="polite"></span>
+
+    <label for="passwordConfirm">Confirmar contraseña:</label>
+    <input type="password" id="passwordConfirm" required>
+    <span class="field-error" id="err-passwordConfirm" aria-live="polite"></span>
     <label for="role">Rol:</label>
     <select id="role" required>
       <option value="cliente">Cliente</option>
@@ -36,11 +45,9 @@
       <label for="direccionTienda">Dirección (si es física):</label>
       <input type="text" id="direccionTienda" placeholder="Calle, número, ciudad">
 
-      <label for="telefonoTienda">Datos de contacto:</label>
-      <input type="text" id="telefonoTienda" placeholder="Teléfono o WhatsApp">
-      <span class="field-error" id="err-telefonoTienda" aria-live="polite"></span>
-
-      <label for="horarioTienda">Horario de atención:</label>
+    <label for="telefonoTienda">Datos de contacto:</label>
+    <input type="tel" id="telefonoTienda" placeholder="Teléfono o WhatsApp">
+    <span class="field-error" id="err-telefonoTienda" aria-live="polite"></span>      <label for="horarioTienda">Horario de atención:</label>
       <input type="text" id="horarioTienda" placeholder="Ej: Lun-Vie 9:00-18:00">
 
       <label for="responsableTienda">Persona responsable:</label>
@@ -49,5 +56,223 @@
     <button type="submit">Registrarse</button>
   </form>
   <p>¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a></p>
+
+  <script>
+    // Registro.html - Comprehensive Form Validation
+    
+    const form = document.getElementById('formRegistro');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const passwordConfirmInput = document.getElementById('passwordConfirm');
+    const roleSelect = document.getElementById('role');
+    const storeFields = document.getElementById('storeFields');
+    const nombreTiendaInput = document.getElementById('nombreTienda');
+    const telefonoTiendaInput = document.getElementById('telefonoTienda');
+    const responsableTiendaInput = document.getElementById('responsableTienda');
+    const formErrorDiv = document.getElementById('formError');
+
+    // Show/Hide store fields based on role
+    roleSelect.addEventListener('change', (e) => {
+      storeFields.style.display = e.target.value === 'tienda' ? 'block' : 'none';
+    });
+
+    // Real-time email validation
+    emailInput.addEventListener('blur', () => {
+      const errSpan = document.getElementById('err-email');
+      if (emailInput.value) {
+        const isValid = ValidationService.validarEmail(emailInput.value);
+        if (isValid.valido) {
+          errSpan.textContent = '';
+          emailInput.style.borderColor = '#4caf50';
+        } else {
+          errSpan.textContent = isValid.mensaje;
+          emailInput.style.borderColor = '#d32f2f';
+        }
+      }
+    });
+
+    // Real-time password strength indicator
+    passwordInput.addEventListener('input', () => {
+      const pwd = passwordInput.value;
+      const strengthDiv = document.getElementById('passwordStrength');
+      const errSpan = document.getElementById('err-password');
+
+      if (!pwd) {
+        strengthDiv.innerHTML = '';
+        errSpan.textContent = '';
+        return;
+      }
+
+      const validation = ValidationService.validarPasswordFuerte(pwd);
+      const strength = calcularFortaleza(pwd);
+
+      errSpan.textContent = !validation.valido ? validation.mensaje : '';
+      
+      const colors = ['#d32f2f', '#ff9800', '#fbc02d', '#8bc34a'];
+      const labels = ['Débil', 'Regular', 'Buena', 'Fuerte'];
+      const color = colors[strength];
+      const label = labels[strength];
+
+      strengthDiv.innerHTML = `
+        <div style="background: #e0e0e0; height: 6px; border-radius: 3px; overflow: hidden;">
+          <div style="background: ${color}; height: 100%; width: ${(strength + 1) * 25}%; transition: width 0.3s;"></div>
+        </div>
+        <small style="color: ${color}; font-weight: bold;">Contraseña ${label}</small>
+      `;
+    });
+
+    // Real-time password confirmation validation
+    passwordConfirmInput.addEventListener('blur', () => {
+      const errSpan = document.getElementById('err-passwordConfirm');
+      if (passwordConfirmInput.value) {
+        if (passwordInput.value !== passwordConfirmInput.value) {
+          errSpan.textContent = 'Las contraseñas no coinciden';
+          passwordConfirmInput.style.borderColor = '#d32f2f';
+        } else {
+          errSpan.textContent = '';
+          passwordConfirmInput.style.borderColor = '#4caf50';
+        }
+      }
+    });
+
+    // Real-time phone validation
+    telefonoTiendaInput.addEventListener('blur', () => {
+      const errSpan = document.getElementById('err-telefonoTienda');
+      if (telefonoTiendaInput.value) {
+        const validation = ValidationService.validarTelefono(telefonoTiendaInput.value);
+        if (validation.valido) {
+          errSpan.textContent = '';
+          telefonoTiendaInput.style.borderColor = '#4caf50';
+        } else {
+          errSpan.textContent = validation.mensaje;
+          telefonoTiendaInput.style.borderColor = '#d32f2f';
+        }
+      }
+    });
+
+    // Real-time store name validation
+    nombreTiendaInput.addEventListener('blur', () => {
+      const errSpan = document.getElementById('err-nombreTienda');
+      if (nombreTiendaInput.value) {
+        const validation = ValidationService.validarNombre(nombreTiendaInput.value);
+        if (validation.valido) {
+          errSpan.textContent = '';
+          nombreTiendaInput.style.borderColor = '#4caf50';
+        } else {
+          errSpan.textContent = validation.mensaje;
+          nombreTiendaInput.style.borderColor = '#d32f2f';
+        }
+      }
+    });
+
+    // Form submission with full validation
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      formErrorDiv.textContent = '';
+      formErrorDiv.style.display = 'none';
+
+      // Collect form data
+      const data = {
+        email: emailInput.value.trim(),
+        password: passwordInput.value,
+        passwordConfirm: passwordConfirmInput.value,
+        role: roleSelect.value,
+        nombreTienda: nombreTiendaInput.value.trim(),
+        telefonoTienda: telefonoTiendaInput.value.trim(),
+        responsableTienda: responsableTiendaInput.value.trim()
+      };
+
+      // Validate all fields
+      const errors = [];
+
+      // Email validation
+      const emailVal = ValidationService.validarEmail(data.email);
+      if (!emailVal.valido) errors.push(emailVal.mensaje);
+
+      // Password validation
+      const pwdVal = ValidationService.validarPasswordFuerte(data.password);
+      if (!pwdVal.valido) errors.push(pwdVal.mensaje);
+
+      // Password confirmation
+      if (data.password !== data.passwordConfirm) {
+        errors.push('Las contraseñas no coinciden');
+      }
+
+      // Store-specific validation
+      if (data.role === 'tienda') {
+        const nameVal = ValidationService.validarNombre(data.nombreTienda);
+        if (!nameVal.valido) errors.push('Tienda: ' + nameVal.mensaje);
+
+        const phoneVal = ValidationService.validarTelefono(data.telefonoTienda);
+        if (!phoneVal.valido) errors.push('Tienda: ' + phoneVal.mensaje);
+      }
+
+      // Show errors if any
+      if (errors.length > 0) {
+        formErrorDiv.textContent = 'Errores en el formulario: ' + errors.join(', ');
+        formErrorDiv.style.display = 'block';
+        return;
+      }
+
+      // Sanitize and prepare for submission
+      data.email = ValidationService.sanitizarString(data.email);
+      data.nombreTienda = ValidationService.sanitizarString(data.nombreTienda);
+      data.responsableTienda = ValidationService.sanitizarString(data.responsableTienda);
+
+      try {
+        // Call existing registration function (expected to exist in authservice.js)
+        if (typeof registrarse === 'function') {
+          await registrarse(data);
+          
+          // Log transaction
+          TransactionService.registrarTransaccion({
+            tipo: 'registro',
+            usuario: data.email,
+            rol: data.role,
+            descripcion: 'Nuevo usuario registrado',
+            estado: 'exitoso'
+          });
+
+          // Emit event
+          EventBus.emit('usuario-registro', { email: data.email, role: data.role });
+
+          // Success feedback
+          alert('Registro exitoso. Redireccionando...');
+          window.location.href = 'login.html';
+        } else {
+          throw new Error('Función registrarse no disponible');
+        }
+      } catch (error) {
+        console.error('Error en registro:', error);
+        formErrorDiv.textContent = 'Error en el registro: ' + error.message;
+        formErrorDiv.style.display = 'block';
+
+        // Log failed transaction
+        TransactionService.registrarTransaccion({
+          tipo: 'registro',
+          usuario: data.email,
+          rol: data.role,
+          descripcion: 'Intento de registro fallido: ' + error.message,
+          estado: 'fallido'
+        });
+      }
+    });
+
+    // Helper function: Calculate password strength
+    function calcularFortaleza(pwd) {
+      let strength = 0;
+      if (pwd.length >= 8) strength++;
+      if (/[A-Z]/.test(pwd)) strength++;
+      if (/[0-9]/.test(pwd)) strength++;
+      if (/[!@#$%^&*]/.test(pwd)) strength++;
+      return Math.min(strength - 1, 3);
+    }
+
+    // Set default password strength on page load
+    if (passwordInput.value) {
+      const event = new Event('input');
+      passwordInput.dispatchEvent(event);
+    }
+  </script>
 </body>
 </html>
