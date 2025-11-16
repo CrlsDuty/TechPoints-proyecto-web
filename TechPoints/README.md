@@ -1,6 +1,6 @@
 # TechPoints — Instrucciones de prueba
 
-Este proyecto es una demo de un sistema de puntos para tiendas de tecnología. Está pensado para ejecutarse como páginas estáticas (sin backend) y usa Web Storage (sessionStorage) para persistencia temporal.
+Este proyecto es una demo de un sistema de puntos para tiendas de tecnología. Está pensado para ejecutarse como páginas estáticas (sin backend) y usa un `StorageService` sobre `localStorage` para persistencia en el navegador.
 
 Contenido de esta guía
 - Requisitos mínimos
@@ -33,11 +33,11 @@ Flujos de prueba detallados
 		- Horario de atención (opcional)
 		- Persona responsable (opcional)
 	3. El proyecto valida campos obligatorios y muestra toasts de error si faltan. Al enviar, usa `Utils.delayWithCallback` (callback de demo) y redirige al login.
-	4. Verifica que el usuario queda guardado en `sessionStorage` bajo `usuarios` con su estructura completa (incluyendo `tienda` si es tipo tienda).
+	4. Verifica que el usuario queda guardado usando el `StorageService` (ej: `StorageService.get('usuarios')`) con su estructura completa (incluyendo `tienda` si es tipo tienda).
 
 - Login
 	1. En `pages/login.html` inicia sesión con uno de los usuarios demo (o con el usuario que registraste).
-	2. Si el login es correcto, se guarda `usuarioActivo` en `sessionStorage` y se redirige según el rol (cliente → `cliente.html`, tienda → `tienda.html`).
+	2. Si el login es correcto, se guarda `usuarioActivo` a través de `StorageService.set('usuarioActivo', usuario)` y se redirige según el rol (cliente → `cliente.html`, tienda → `tienda.html`).
 
 - Agregar puntos (Promises + async/await)
 	1. Inicia sesión como `tienda@mail.com` (admin).
@@ -49,7 +49,7 @@ Flujos de prueba detallados
 - Agregar producto (Promises + async/await)
 	1. En `pages/tienda.html`, en "Agregar producto" crea un producto (nombre, costo en puntos).
 	2. El form usa `await ProductService.agregarProducto(...)` que devuelve una Promise. Tras completarse, el producto aparece en "Mis productos".
-	3. Verifica que `productos` existe en `sessionStorage`.
+	3. Verifica que `productos` existe consultando `StorageService.get('productos')`.
 
 - Canjear producto (Promises + async/await)
 	1. Inicia sesión como `ana@mail.com` (cliente).
@@ -74,8 +74,9 @@ Archivos modificados / puntos de interés
 
 Notas y recomendaciones
 - Esta es una demo cliente: las contraseñas se almacenan en texto en el Storage del navegador. Para producción, necesitarás un backend con hashing y almacenamiento seguro.
-- Los datos de tienda (nombre, dirección, horario, etc.) están persistidos en `sessionStorage` bajo `usuarios[...].tienda` y se pueden editar en vivo desde el botón "✏️ Editar" en la zona de tienda.
-- Puedes migrar de `sessionStorage` a `localStorage` si quieres persistencia entre sesiones del navegador.
+- Los datos de tienda (nombre, dirección, horario, etc.) están persistidos usando `StorageService` (basado en `localStorage`) bajo `usuarios[...].tienda` y se pueden editar en vivo desde el botón "✏️ Editar" en la zona de tienda.
+
+Nota: El proyecto ya utiliza `StorageService` para persistencia. Si alguna documentación antigua menciona `sessionStorage`, considera que la implementación actual guarda los datos con `StorageService` (que usa `localStorage`) para mantenerlos entre sesiones.
 - El proyecto ya usa toasts (notificaciones no-bloqueantes) en lugar de alerts para una mejor UX.
 - Próximo paso: integrar Supabase como backend para persistencia permanente y autenticación segura.
 

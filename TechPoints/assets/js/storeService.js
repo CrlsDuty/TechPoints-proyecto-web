@@ -35,6 +35,18 @@ const StoreService = {
       const resultado = AuthService.actualizarUsuario(cliente);
 
       if (resultado.success) {
+        // Emitir evento y registrar transacción
+        if (window.EventBus && typeof EventBus.emit === 'function') {
+          try { EventBus.emit('puntos-agregados', cliente); } catch (e) { console.warn('EventBus emit failed (puntos-agregados)', e); }
+        }
+
+        if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+          try {
+            const tienda = AuthService.obtenerUsuarioActivo()?.email || 'desconocida';
+            TransactionService.registrarTransaccion('compra-puntos', { cliente: clienteEmail, puntos: puntosNum, tienda });
+          } catch (e) { console.warn('Failed to register transaction (compra-puntos)', e); }
+        }
+
         return resolve({ 
           success: true, 
           message: `Se agregaron ${puntosNum} puntos a ${clienteEmail}`,

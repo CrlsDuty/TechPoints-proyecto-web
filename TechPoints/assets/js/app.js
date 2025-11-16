@@ -87,6 +87,10 @@ function inicializarLogin(formLogin) {
 
     if (resultado.success) {
       AuthService.guardarUsuarioActivo(resultado.usuario);
+      // Emitir evento global de login para que otros módulos reaccionen
+      if (window.EventBus && typeof EventBus.emit === 'function') {
+        try { EventBus.emit('usuario-login', resultado.usuario); } catch (e) { console.warn('EventBus emit failed (login)', e); }
+      }
       
       // Redirigir según el rol
       if (resultado.usuario.role === "cliente") {
@@ -1038,8 +1042,76 @@ function cerrarModalProductoTienda() {
 
 // ========== LOGOUT ==========
 function logout() {
-  
+  // Emitir evento de logout antes de limpiar sesión
+  const usuario = AuthService.obtenerUsuarioActivo();
+  if (usuario && window.EventBus && typeof EventBus.emit === 'function') {
+    try { EventBus.emit('usuario-logout', usuario.email); } catch (e) { console.warn('EventBus emit failed (logout)', e); }
+  }
+
   AuthService.cerrarSesion();
   window.location.href = "login.html";
   
+
+// ========== EVENTBUS LISTENERS (UI UPDATES & AUDIT) ==========
+if (window.EventBus) {
+  // Cuando se agregan puntos a un cliente
+  EventBus.on('puntos-agregados', (cliente) => {
+    try {
+      if (window.location.pathname.includes('cliente.html')) {
+        if (typeof actualizarInfoCliente === 'function') actualizarInfoCliente(cliente);
+        if (typeof mostrarProductosDisponibles === 'function') mostrarProductosDisponibles();
+        if (typeof mostrarHistorial === 'function') mostrarHistorial();
+      }
+      if (window.Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(`Puntos actualizados para ${cliente.email}`, 'success');
+      if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+        TransactionService.registrarTransaccion('compra-puntos', { cliente: cliente.email, puntos: cliente.puntos });
+      }
+    } catch (err) {
+      console.warn('Error en listener puntos-agregados:', err);
+    }
+  });
+
+  // Cuando se canjea un producto
+  EventBus.on('producto-canjeado', (data) => {
+    try {
+      if (typeof actualizarInfoCliente === 'function') actualizarInfoCliente(data.cliente);
+      if (typeof mostrarProductosDisponibles === 'function') mostrarProductosDisponibles();
+      if (typeof mostrarHistorial === 'function') mostrarHistorial();
+
+      console.log(`✅ Canje completado - Cliente: ${data.cliente.email} - Producto: ${data.producto.nombre}`);
+
+      if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+        TransactionService.registrarTransaccion('canje', {
+          cliente: data.cliente.email,
+          producto: data.producto.nombre,
+          puntos: data.producto.costo,
+          tienda: data.producto.tienda
+        });
+      }
+    } catch (err) {
+      console.warn('Error en listener producto-canjeado:', err);
+    }
+  });
+
+  // Auditoría de login/logout
+  EventBus.on('usuario-login', (usuario) => {
+    try {
+      if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+        TransactionService.registrarTransaccion('login', { email: usuario.email, rol: usuario.role });
+      }
+    } catch (err) {
+      console.warn('Error registrando transaccion login:', err);
+    }
+  });
+
+  EventBus.on('usuario-logout', (email) => {
+    try {
+      if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+        TransactionService.registrarTransaccion('logout', { email });
+      }
+    } catch (err) {
+      console.warn('Error registrando transaccion logout:', err);
+    }
+  });
+}
 }

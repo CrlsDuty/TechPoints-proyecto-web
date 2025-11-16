@@ -4,13 +4,12 @@
 const ProductService = {
   // Obtener todos los productos
   obtenerProductos() {
-    const productos = sessionStorage.getItem("productos");
-    return productos ? JSON.parse(productos) : [];
+    return StorageService.get('productos', []) || [];
   },
 
   // Guardar productos
   guardarProductos(productos) {
-    sessionStorage.setItem("productos", JSON.stringify(productos));
+    StorageService.set('productos', productos);
   },
 
   // Agregar nuevo producto
@@ -119,6 +118,23 @@ const ProductService = {
       // Guardar producto con stock actualizado
       this.guardarProductos(productos);
 
+      // Registrar transacción y emitir evento global
+      if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+        try {
+          TransactionService.registrarTransaccion('canje', {
+            cliente: cliente.email,
+            producto: producto.nombre,
+            puntos: producto.costo,
+            tienda: producto.tienda
+          });
+        } catch (e) {
+          console.warn('Failed to register transaction (canje)', e);
+        }
+      }
+
+      if (window.EventBus && typeof EventBus.emit === 'function') {
+        try { EventBus.emit('producto-canjeado', { cliente, producto, timestamp: new Date() }); } catch (e) { console.warn('EventBus emit failed (producto-canjeado)', e); }
+      }
       if (resultadoCliente.success) {
         return resolve({ 
           success: true, 

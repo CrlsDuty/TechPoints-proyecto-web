@@ -89,29 +89,28 @@ const AuthService = {
 
   // Obtener usuario activo
   obtenerUsuarioActivo() {
-    const usuario = sessionStorage.getItem("usuarioActivo");
-    return usuario ? JSON.parse(usuario) : null;
+    return StorageService.get('usuarioActivo', null);
   },
 
   // Guardar usuario activo en sesión
   guardarUsuarioActivo(usuario) {
-    sessionStorage.setItem("usuarioActivo", JSON.stringify(usuario));
+    // Guardamos con expiración por defecto de 24 horas para sesiones
+    StorageService.set('usuarioActivo', usuario, 24 * 60 * 60 * 1000);
   },
 
   // Cerrar sesión
   cerrarSesion() {
-    sessionStorage.removeItem("usuarioActivo");
+    StorageService.remove('usuarioActivo');
   },
 
   // Obtener todos los usuarios
   obtenerUsuarios() {
-    const usuarios = sessionStorage.getItem("usuarios");
-    return usuarios ? JSON.parse(usuarios) : [];
+    return StorageService.get('usuarios', []) || [];
   },
 
   // Guardar usuarios
   guardarUsuarios(usuarios) {
-    sessionStorage.setItem("usuarios", JSON.stringify(usuarios));
+    StorageService.set('usuarios', usuarios);
   },
 
   // Actualizar usuario en la lista
