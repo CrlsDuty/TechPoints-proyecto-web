@@ -223,10 +223,26 @@
       data.responsableTienda = ValidationService.sanitizarString(data.responsableTienda);
 
       try {
-        // Call existing registration function (expected to exist in authservice.js)
-        if (typeof registrarse === 'function') {
-          await registrarse(data);
-          
+        // Prepare tienda info if role is tienda
+        let tiendaInfo = null;
+        if (data.role === 'tienda') {
+          tiendaInfo = {
+            nombre: data.nombreTienda,
+            telefono: data.telefonoTienda,
+            responsable: data.responsableTienda,
+            direccion: document.getElementById('direccionTienda').value.trim(),
+            horario: document.getElementById('horarioTienda').value.trim()
+          };
+        }
+
+        // Call AuthService.signUp
+        console.log('[Registro] 🚀 Llamando AuthService.signUp con:', { email: data.email, role: data.role });
+        const resultado = await AuthService.signUp(data.email, data.password, data.role, tiendaInfo);
+        
+        console.log('[Registro] 📊 Resultado de signUp:', resultado);
+        
+        if (resultado.success) {
+          console.log('[Registro] ✅ Registro exitoso, resultado:', resultado);
           // Log transaction
           TransactionService.registrarTransaccion({
             tipo: 'registro',
@@ -237,13 +253,16 @@
           });
 
           // Emit event
-          EventBus.emit('usuario-registro', { email: data.email, role: data.role });
+          if (typeof EventBus !== 'undefined' && EventBus.emit) {
+            EventBus.emit('usuario-registro', { email: data.email, role: data.role });
+          }
 
           // Success feedback
           alert('Registro exitoso. Redireccionando...');
           window.location.href = 'login.html';
         } else {
-          throw new Error('Función registrarse no disponible');
+          console.error('[Registro] ❌ Registro falló, resultado:', resultado);
+          throw new Error(resultado.message || 'Error desconocido en el registro');
         }
       } catch (error) {
         console.error('Error en registro:', error);

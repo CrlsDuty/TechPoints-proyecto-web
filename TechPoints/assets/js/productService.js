@@ -513,8 +513,8 @@ const ProductService = {
 
   // Actualizar producto (editar detalles incluyendo stock)
   async actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = null) {
-    // Intentar actualizar en Supabase usando UPDATE con filtro en URL
-    console.log('[ProductService] Actualizando producto en Supabase...');
+    // Intentar actualizar en Supabase usando RPC function
+    console.log('[ProductService] Actualizando producto en Supabase vía RPC...');
     
     let supabaseSuccess = false;
     try {
@@ -522,48 +522,49 @@ const ProductService = {
         throw new Error('Supabase no está disponible');
       }
 
-      // Construir URL con filtro manualmente para evitar problemas con PostgREST
-      const updateData = {
-        nombre: nombre.trim(),
-        costo_puntos: parseInt(costo),
-        precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
-        descripcion: descripcion ? descripcion.trim() : null,
-        imagen_url: imagen ? imagen.trim() : null,
-        stock: stock !== null ? parseInt(stock) : null,
-        actualizado_at: new Date().toISOString()
-      };
-
-      // Eliminar campos null
-      Object.keys(updateData).forEach(key => 
-        updateData[key] === null && delete updateData[key]
-      );
-
-      // Usar fetch directo a PostgREST REST API (más confiable que el cliente)
-      const url = `${window.supabase.url}/rest/v1/products?id=eq.${productoId}`;
-      const headers = {
-        'Content-Type': 'application/json',
-        'apikey': window.supabase._anonKey,
-        'Prefer': 'return=representation'
-      };
-
-      console.log('[ProductService] Fetch directo a:', url);
-      
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify(updateData)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[ProductService] ✅ Producto actualizado en Supabase:', data);
-        supabaseSuccess = true;
-      } else {
-        const errorText = await response.text();
-        console.warn('[ProductService] ⚠️ Error HTTP ' + response.status + ':', errorText);
+      // Validaciones
+      if (!nombre || !costo) {
+        throw new Error('Nombre y costo son requeridos');
       }
+
+      if (costo <= 0) {
+        throw new Error('El costo debe ser mayor a 0');
+      }
+
+      if (stock !== null && stock < 0) {
+        throw new Error('El stock no puede ser negativo');
+      }
+
+      // Preparar datos para RPC
+      const rpcParams = {
+        p_id: productoId,
+        p_nombre: nombre ? nombre.trim() : null,
+        p_costo_puntos: costo ? parseInt(costo) : null,
+        p_precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
+        p_stock: stock !== null ? parseInt(stock) : null,
+        p_descripcion: descripcion ? descripcion.trim() : null,
+        p_imagen_url: imagen ? imagen.trim() : null
+      };
+
+      console.log('[ProductService] 🔄 Llamando RPC actualizar_producto con:', rpcParams);
+
+      // Llamar RPC function (más confiable que POST/PATCH)
+      const { data, error } = await window.supabase.rpc('actualizar_producto', rpcParams);
+
+      if (error) {
+        console.warn('[ProductService] ⚠️ Error en RPC:', error.message);
+        throw error;
+      }
+
+      if (!data || !data[0]?.success) {
+        console.warn('[ProductService] ⚠️ RPC retornó error:', data?.[0]?.message);
+        throw new Error(data?.[0]?.message || 'Error desconocido en RPC');
+      }
+
+      console.log('[ProductService] ✅ Producto actualizado en Supabase vía RPC:', data[0]);
+      supabaseSuccess = true;
     } catch (e) {
-      console.warn('[ProductService] ⚠️ Supabase update falló:', e.message);
+      console.warn('[ProductService] ⚠️ Supabase RPC update falló:', e.message);
     }
 
     // Fallback: localStorage (para respaldo si Supabase falla)
