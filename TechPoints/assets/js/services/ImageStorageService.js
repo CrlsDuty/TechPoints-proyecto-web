@@ -8,13 +8,13 @@ const ImageStorageService = {
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
 
-  // Verificar si Supabase Storage está disponible
+  // Verificar si Supabase Storage está disponible (vía API, no necesita window.supabase.storage)
   isStorageAvailable() {
     try {
-      return typeof window.supabase !== 'undefined' && 
-             window.supabase !== null && 
-             typeof window.supabase.storage !== 'undefined' &&
-             window.supabase.storage !== null;
+      return typeof window._SUPABASE_CONFIG !== 'undefined' && 
+             window._SUPABASE_CONFIG !== null && 
+             window._SUPABASE_CONFIG.url &&
+             window._SUPABASE_CONFIG.anonKey;
     } catch (e) {
       console.warn('[ImageStorageService] Error verificando disponibilidad:', e.message);
       return false;
@@ -61,20 +61,12 @@ const ImageStorageService = {
     throw new Error('Input must be File or Blob');
   },
 
-  // Subir imagen a Supabase Storage
+  // Subir imagen a Supabase Storage usando fetch directo (sin window.supabase.storage)
   async uploadImage(file, tiendaId, productoId) {
     console.log('[ImageStorageService] 🔍 Verificando disponibilidad de Storage...');
-    console.log('[ImageStorageService] window.supabase:', typeof window.supabase);
-    console.log('[ImageStorageService] window.supabase.storage:', typeof window.supabase?.storage);
     
     if (!this.isStorageAvailable()) {
-      console.warn('[ImageStorageService] ❌ Storage no disponible');
-      console.warn('[ImageStorageService] Debug info:', {
-        hasSupabase: typeof window.supabase !== 'undefined',
-        supabaseIsNull: window.supabase === null,
-        hasStorage: typeof window.supabase?.storage !== 'undefined',
-        storageIsNull: window.supabase?.storage === null
-      });
+      console.warn('[ImageStorageService] ❌ Storage no disponible - Config no encontrada');
       return { success: false, error: 'Storage no disponible', url: null };
     }
 
@@ -103,44 +95,45 @@ const ImageStorageService = {
       // Convertir a Blob
       const blob = await this.fileToBlob(file);
 
-      // Subir a Storage
-      const { data, error } = await window.supabase.storage
-        .from(this.BUCKET_NAME)
-        .upload(storagePath, blob, {
-          contentType: file.type,
-          upsert: false
-        });
+      // Usar fetch directo para subir a Storage
+      const config = window._SUPABASE_CONFIG;
+      const uploadUrl = `${config.url}/storage/v1/object/${this.BUCKET_NAME}/${storagePath}`;
+      
+      console.log('[ImageStorageService] 📤 Subiendo a:', uploadUrl);
 
-      if (error) {
-        console.error('[ImageStorageService] Error en upload:', error.message);
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': config.anonKey,
+          'Authorization': `Bearer ${config.anonKey}`,
+          'Content-Type': file.type
+        },
+        body: blob
+      });
+
+      const uploadResponseText = await uploadResponse.text();
+      console.log('[ImageStorageService] 📥 Respuesta upload status:', uploadResponse.status);
+      console.log('[ImageStorageService] 📥 Respuesta upload body:', uploadResponseText);
+
+      if (!uploadResponse.ok) {
+        console.error('[ImageStorageService] Error en upload:', uploadResponseText);
         
-        if (error.message.includes('404') || error.message.includes('not found')) {
-          console.warn('[ImageStorageService] ❌ Bucket no existe. Por favor, crea un bucket llamado "product-images" en Supabase Storage');
+        if (uploadResponse.status === 404) {
+          console.warn('[ImageStorageService] ❌ Bucket no existe o Storage no configurado');
           return { 
             success: false, 
-            error: 'Bucket no configurado. Por favor, configura Supabase Storage.',
+            error: 'Bucket no configurado',
             url: null,
             needsSetup: true
           };
         }
 
-        return { success: false, error: error.message, url: null };
+        return { success: false, error: uploadResponseText, url: null };
       }
 
-      console.log('[ImageStorageService] ✅ Archivo subido:', data);
-
-      // Obtener URL pública
-      const { data: publicUrlData } = window.supabase.storage
-        .from(this.BUCKET_NAME)
-        .getPublicUrl(storagePath);
-
-      const publicUrl = publicUrlData?.publicUrl;
-
-      if (!publicUrl) {
-        console.error('[ImageStorageService] No se pudo obtener URL pública');
-        return { success: false, error: 'No se pudo obtener URL de la imagen', url: null };
-      }
-
+      // Construir URL pública
+      const publicUrl = `${config.url}/storage/v1/object/public/${this.BUCKET_NAME}/${storagePath}`;
+      
       console.log('[ImageStorageService] ✅ Imagen subida exitosamente:', publicUrl);
 
       return { success: true, url: publicUrl, path: storagePath };
@@ -165,13 +158,19 @@ const ImageStorageService = {
 
       console.log('[ImageStorageService] Eliminando imagen:', storagePath);
 
-      const { error } = await window.supabase.storage
-        .from(this.BUCKET_NAME)
-        .remove([storagePath]);
+      const config = window._SUPABASE_CONFIG;
+      const deleteUrl = `${config.url}/storage/v1/object/${this.BUCKET_NAME}/${storagePath}`;
 
-      if (error) {
-        console.warn('[ImageStorageService] Error eliminando imagen:', error.message);
-        // No es crítico si falla la eliminación
+      const deleteResponse = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'apikey': config.anonKey,
+          'Authorization': `Bearer ${config.anonKey}`
+        }
+      });
+
+      if (!deleteResponse.ok) {
+        console.warn('[ImageStorageService] Error eliminando imagen:', deleteResponse.status);
         return { success: true }; // Continuar de todas formas
       }
 
@@ -190,11 +189,8 @@ const ImageStorageService = {
     }
 
     try {
-      const { data } = window.supabase.storage
-        .from(this.BUCKET_NAME)
-        .getPublicUrl(storagePath);
-
-      return data?.publicUrl || null;
+      const config = window._SUPABASE_CONFIG;
+      return `${config.url}/storage/v1/object/public/${this.BUCKET_NAME}/${storagePath}`;
     } catch (e) {
       console.error('[ImageStorageService] Error obteniendo URL:', e);
       return null;

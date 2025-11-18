@@ -3,6 +3,12 @@
 (function () {
   const SUPABASE_URL = 'https://nfetcnyhwgimusluxdfj.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mZXRjbnlod2dpbXVzbHV4ZGZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzNTM1NTEsImV4cCI6MjA3ODkyOTU1MX0._v9KKrBNyzog40YfY-jwiHy3r9eEEwvqR90IxSz6vYQ';
+  
+  // Guardar en window para acceso desde otros scripts
+  window._SUPABASE_CONFIG = {
+    url: SUPABASE_URL,
+    anonKey: SUPABASE_ANON_KEY
+  };
 
   const LOCAL_CDN_URL = './assets/vendor/supabase.min.js';
   const REMOTE_CDN_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js';

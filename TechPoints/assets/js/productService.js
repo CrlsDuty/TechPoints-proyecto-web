@@ -560,11 +560,9 @@ const ProductService = {
 
   // Actualizar producto (editar detalles incluyendo stock e imágenes)
   async actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagenFileOrUrl = null, stock = null) {
-    // Intentar actualizar en Supabase usando RPC function
     console.log('[ProductService] Actualizando producto en Supabase vía RPC...');
     
     let supabaseSuccess = false;
-    let imagenUrlFinal = null;
     
     try {
       if (!window.supabase) {
@@ -584,9 +582,10 @@ const ProductService = {
         throw new Error('El stock no puede ser negativo');
       }
 
-      // Si hay nueva imagen (File), subirla primero
+      // Si hay nueva imagen (File), intentar subirla a Storage
+      let imagenUrlFinal = null;
       if (imagenFileOrUrl && imagenFileOrUrl instanceof File) {
-        console.log('[ProductService] 📸 Nueva imagen detectada, subiendo a Storage...');
+        console.log('[ProductService] 📸 Nueva imagen detectada, intentando subir a Storage...');
         
         // Obtener tienda para subir imagen
         const { data: stores, error: storeError } = await window.supabase
@@ -596,22 +595,31 @@ const ProductService = {
           .single();
 
         if (!storeError && stores) {
-          const uploadResult = await ImageStorageService.uploadImage(
-            imagenFileOrUrl,
-            stores.id,
-            productoId
-          );
-
-          if (uploadResult.success) {
-            imagenUrlFinal = uploadResult.url;
-            console.log('[ProductService] ✅ Imagen subida:', imagenUrlFinal);
+          if (!window.ImageStorageService?.isStorageAvailable?.()) {
+            console.warn('[ProductService] ⚠️ Storage no disponible, continuando sin imagen');
           } else {
-            console.warn('[ProductService] ⚠️ Error subiendo imagen:', uploadResult.error);
-            // Continuar sin imagen si falla
+            const uploadResult = await window.ImageStorageService.uploadImage(
+              imagenFileOrUrl,
+              stores.id,
+              productoId
+            );
+
+            if (uploadResult.success) {
+              imagenUrlFinal = uploadResult.url;
+              console.log('[ProductService] ✅ Imagen subida a Storage:', imagenUrlFinal);
+            } else {
+              console.warn('[ProductService] ⚠️ No se pudo subir imagen:', uploadResult.error);
+              if (uploadResult.needsSetup) {
+                console.warn('[ProductService] ⚠️ IMPORTANTE: Necesitas configurar Supabase Storage.');
+                console.warn('[ProductService] Ver: CONFIGURAR_STORAGE_IMAGENES.md');
+              }
+            }
           }
+        } else {
+          console.warn('[ProductService] ⚠️ No se pudo obtener storeId');
         }
-      } else if (typeof imagenFileOrUrl === 'string') {
-        // Si es string URL, usarla directamente (imagen existente)
+      } else if (typeof imagenFileOrUrl === 'string' && imagenFileOrUrl) {
+        // Si es URL existente, mantenerla
         imagenUrlFinal = imagenFileOrUrl;
       }
 
@@ -628,34 +636,85 @@ const ProductService = {
 
       console.log('[ProductService] 🔄 Llamando RPC actualizar_producto con:', rpcParams);
 
-      // Llamar RPC function (más confiable que POST/PATCH)
+      // Llamar RPC function
       const { data, error } = await window.supabase.rpc('actualizar_producto', rpcParams);
 
       if (error) {
         console.warn('[ProductService] ⚠️ Error en RPC:', error.message);
         
-        // Si es 404, probablemente la función no existe
+        // Si es 404, probablemente la función no existe o hay problema con el nombre
         if (error.message.includes('404')) {
-          console.error('[ProductService] ❌ La función RPC "actualizar_producto" no existe en Supabase');
-          console.error('[ProductService] ❌ Por favor, crea la función RPC en Supabase Console');
-          throw new Error('Función RPC "actualizar_producto" no existe. Configúrala en Supabase.');
+          console.error('[ProductService] ❌ RPC no encontrada. Usando PATCH como fallback...');
+          
+          // Usar PATCH directo con fetch (más compatible)
+          const patchData = {
+            nombre: nombre ? nombre.trim() : undefined,
+            costo_puntos: costo ? parseInt(costo) : undefined,
+            precio_dolar: precioDolar ? parseFloat(precioDolar) : undefined,
+            descripcion: descripcion ? descripcion.trim() : undefined,
+            imagen_url: imagenUrlFinal || undefined,
+            stock: stock !== null ? parseInt(stock) : undefined,
+            actualizado_at: new Date().toISOString()
+          };
+          
+          // Limpiar valores undefined
+          Object.keys(patchData).forEach(key => patchData[key] === undefined && delete patchData[key]);
+          
+          const config = window._SUPABASE_CONFIG;
+          // Usar formato correcto para el filtro: ?id=eq.VALOR
+          const patchUrl = `${config.url}/rest/v1/products?id=eq.${productoId}`;
+          const patchHeaders = {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey,
+            'Authorization': `Bearer ${config.anonKey}`,
+            'Prefer': 'return=representation'
+          };
+          
+          console.log('[ProductService] 📤 Enviando PATCH a:', patchUrl);
+          console.log('[ProductService] 📤 Datos:', JSON.stringify(patchData));
+          
+          const patchResponse = await fetch(patchUrl, {
+            method: 'PATCH',
+            headers: patchHeaders,
+            body: JSON.stringify(patchData)
+          });
+          
+          const patchResponseText = await patchResponse.text();
+          console.log('[ProductService] 📥 Respuesta PATCH status:', patchResponse.status);
+          console.log('[ProductService] 📥 Respuesta PATCH body:', patchResponseText);
+          
+          if (!patchResponse.ok) {
+            console.error('[ProductService] ❌ PATCH error:', patchResponseText);
+            throw new Error(`PATCH error: ${patchResponse.status} ${patchResponseText}`);
+          }
+          
+          try {
+            const patchResult = JSON.parse(patchResponseText);
+            console.log('[ProductService] ✅ Producto actualizado via PATCH:', patchResult);
+          } catch (e) {
+            console.log('[ProductService] ✅ Producto actualizado via PATCH (sin respuesta JSON)');
+          }
+          supabaseSuccess = true;
+          
+          // Recargar productos desde Supabase para reflejar cambios en UI
+          console.log('[ProductService] 🔄 Recargando productos desde Supabase...');
+          const productosActualizados = await this.obtenerProductos();
+          if (productosActualizados && productosActualizados.length > 0) {
+            console.log('[ProductService] ✅ Productos recargados desde Supabase');
+          }
+        } else {
+          throw error;
         }
-        
-        throw error;
-      }
-
-      if (!data || !data[0]?.success) {
+      } else if (!data || !data[0]?.success) {
         console.warn('[ProductService] ⚠️ RPC retornó error:', data?.[0]?.message);
         throw new Error(data?.[0]?.message || 'Error desconocido en RPC');
+      } else {
+        console.log('[ProductService] ✅ Producto actualizado en Supabase vía RPC:', data[0]);
+        supabaseSuccess = true;
       }
-
-      console.log('[ProductService] ✅ Producto actualizado en Supabase vía RPC:', data[0]);
-      supabaseSuccess = true;
     } catch (e) {
-      console.warn('[ProductService] ⚠️ Supabase RPC update falló:', e.message);
-    }
-
-    // Fallback: localStorage (para respaldo si Supabase falla)
+      console.warn('[ProductService] ⚠️ Supabase update falló:', e.message);
+    }    // Fallback: localStorage (para respaldo si Supabase falla)
     return new Promise(async (resolve) => {
       if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(200);
 
@@ -707,7 +766,7 @@ const ProductService = {
       this.guardarProductos(productos);
       console.log('[ProductService] ✅ Producto guardado en localStorage:', productoActualizado.nombre);
 
-      // Retornar éxito (ya actualizado en Supabase en el bloque anterior)
+      // Retornar éxito
       const mensaje = supabaseSuccess 
         ? 'Producto actualizado en Supabase y localStorage' 
         : 'Producto actualizado en localStorage (Supabase offline/error)';

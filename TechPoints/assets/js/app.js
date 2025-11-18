@@ -350,7 +350,7 @@ async function mostrarProductosDisponibles() {
     }
     
     card.innerHTML = `
-      <div class="producto-imagen">Sin imagen</div>
+      <div class="producto-imagen">${producto.imagen_url ? `<img src="${producto.imagen_url}" alt="${producto.nombre}" style="max-width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">` : 'Sin imagen'}</div>
       <div class="producto-info">
         <h3 class="producto-nombre">${producto.nombre}</h3>
         <p class="producto-tienda">🏪 ${producto.tienda_nombre || producto.tienda || 'Tienda desconocida'}</p>
@@ -394,8 +394,8 @@ function abrirModalProducto(producto, index, puntos, dolares) {
   
   // Mostrar imagen (placeholder si no hay)
   const imagenContainer = document.getElementById("modalProductoImagen");
-  imagenContainer.innerHTML = producto.imagen ? 
-    `<img src="${producto.imagen}" alt="${producto.nombre}" style="max-width: 100%; border-radius: 6px;">` :
+  imagenContainer.innerHTML = producto.imagen_url ? 
+    `<img src="${producto.imagen_url}" alt="${producto.nombre}" style="max-width: 100%; border-radius: 6px;">` :
     `<span>Imagen no disponible</span>`;
   
   // Mostrar estado de stock
