@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Zona Cliente</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechPoints - Mi Área</title>
   <link rel="stylesheet" href="../assets/css/style.css">
   <!-- Supabase DEBE cargarse primero (sin defer para inicialización inmediata) -->
   <script src="../assets/vendor/supabase.min.js"></script>
@@ -19,60 +20,77 @@
   <script defer src="../assets/js/app.js"></script>
 </head>
 <body>
-  <div class="cliente-layout">
-    <!-- SIDEBAR IZQUIERDO: Información del usuario e historial -->
-    <aside class="cliente-sidebar">
-      <div class="cliente-card">
-        <h1>Mis Datos</h1>
-        <div id="resultado"></div>
+  <!-- HEADER -->
+  <div class="header">
+    <h1>TechPoints - Mi Área</h1>
+    <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
+  </div>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <!-- Información del Usuario -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Mis Datos</h2>
+        </div>
+        <div class="user-info" id="resultado"></div>
       </div>
 
-      <div class="cliente-card">
-        <h2>Historial de Canjes</h2>
-        <ul id="historial" class="historial-list"></ul>
+      <!-- Historial de Canjes -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Historial de Canjes</h2>
+        </div>
+        <div class="historial-list" id="historial"></div>
       </div>
-
-      <button onclick="logout()" class="btn-logout">Cerrar sesión</button>
     </aside>
 
-    <!-- CONTENIDO PRINCIPAL: Productos disponibles -->
-    <main class="cliente-main">
-      <h1>Productos Disponibles</h1>
-      <div id="productosDisponibles" class="productos-grid"></div>
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+      <div class="section-header">
+        <h2>Productos Disponibles</h2>
+        <span class="productos-count" id="productosCount">0 productos</span>
+      </div>
+
+      <div class="productos-grid" id="productosDisponibles"></div>
     </main>
   </div>
 
-  <!-- MODAL: Detalle de producto para canje -->
+  <!-- MODAL -->
   <div id="modalProducto" class="modal">
     <div class="modal-content">
-      <span class="modal-close">&times;</span>
       <div class="modal-header">
-        <h2 id="modalProductoNombre"></h2>
+        <span class="modal-close" onclick="cerrarModalProducto()">&times;</span>
+        <h3 id="modalProductoNombre"></h3>
+        <p id="modalProductoTienda" style="color: #64748b; font-size: 0.9rem; margin-top: 0.25rem;"></p>
       </div>
       <div class="modal-body">
         <div id="modalProductoImagen" class="modal-imagen"></div>
-        <div id="modalProductoStock"></div>
-        <div class="modal-info">
-          <p id="modalProductoDescripcion"></p>
-          <div class="modal-precios">
-            <div class="precio-item">
-              <span class="precio-label">Precio en Dólares:</span>
-              <span id="modalProductoPrecioDolar" class="precio-valor"></span>
-            </div>
-            <div class="precio-item">
-              <span class="precio-label">Conversión a Puntos:</span>
-              <span id="modalProductoPuntos" class="precio-valor puntos-badge"></span>
-            </div>
-            <div class="precio-item">
-              <span class="precio-label">Tus Puntos Disponibles:</span>
-              <span id="modalProductosPuntosCliente" class="precio-valor"></span>
-            </div>
+        <p id="modalProductoDescripcion" style="color: #4b5563; line-height: 1.6;"></p>
+        <div class="modal-info-grid">
+          <div class="modal-info-row">
+            <span class="modal-label">Precio en Dólares:</span>
+            <span class="modal-valor" id="modalProductoPrecioDolar"></span>
+          </div>
+          <div class="modal-info-row">
+            <span class="modal-label">Costo en Puntos:</span>
+            <span class="modal-puntos" id="modalProductoPuntos"></span>
+          </div>
+          <div class="modal-info-row">
+            <span class="modal-label">Stock Disponible:</span>
+            <span class="modal-valor" id="modalProductoStock" style="color: #059669;"></span>
+          </div>
+          <div class="modal-info-row">
+            <span class="modal-label">Tus Puntos:</span>
+            <span class="modal-valor" id="modalProductosPuntosCliente" style="color: #0ea5e9; font-size: 1.1rem;"></span>
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btnCancelarCanje" class="btn-secondary">Cancelar</button>
-        <button id="btnConfirmarCanje" class="btn-primary">Confirmar Canje</button>
+        <button class="btn btn-secondary" onclick="cerrarModalProducto()">Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmarCanje" onclick="confirmarCanjeDesdeModal()">Confirmar Canje</button>
       </div>
     </div>
   </div>
