@@ -78,17 +78,49 @@ const AuthService = {
       }
 
       // Si llegamos aquí: perfil en Supabase + credenciales válidas
-      const usuarioFinal = {
+      let usuarioFinal = {
         ...profileData,
         password: undefined
       };
+
+      // Si es tienda, cargar datos de la tienda desde tabla stores
+      if (profileData.role === 'tienda') {
+        console.log('[AuthService] 🏪 Usuario es tienda, cargando datos de stores...');
+        try {
+          const { data: stores, error: storeError } = await window.supabase
+            .from('stores')
+            .select('*')
+            .eq('owner_id', profileData.id)
+            .single();
+
+          if (storeError) {
+            console.warn('[AuthService] ⚠️ Error al cargar datos de tienda:', storeError.message);
+          } else if (stores) {
+            console.log('[AuthService] 📦 Datos de tienda cargados:', stores.nombre);
+            // Extraer datos de contacto (si existen)
+            const contacto = stores.contacto || {};
+            usuarioFinal.tienda = {
+              id: stores.id,
+              nombre: stores.nombre,
+              descripcion: stores.descripcion,
+              direccion: contacto.direccion || '',
+              telefono: contacto.telefono || '',
+              horario: contacto.horario || '',
+              responsable: contacto.responsable || ''
+            };
+          }
+        } catch (err) {
+          console.warn('[AuthService] ⚠️ Exception al cargar tienda:', err.message);
+        }
+      }
 
       StorageService.set('usuarioActivo', usuarioFinal, 24 * 60 * 60 * 1000);
       console.log('[AuthService] ✅✅✅ Login EXITOSO via Supabase:', { 
         id: usuarioFinal.id,
         email: usuarioFinal.email,
         role: usuarioFinal.role,
-        puntos: usuarioFinal.puntos
+        puntos: usuarioFinal.puntos,
+        tienda: usuarioFinal.tienda?.nombre || null
       });
       return { success: true, usuario: usuarioFinal };
 

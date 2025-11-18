@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <title>Zona Cliente</title>
   <link rel="stylesheet" href="../assets/css/style.css">
-  <!-- Scripts: utilidades -> servicios -> app -->
+  <!-- Supabase DEBE cargarse primero (sin defer para inicialización inmediata) -->
+  <script src="../assets/vendor/supabase.min.js"></script>
+  <script src="../assets/js/supabaseClient.js"></script>
+  <!-- Scripts: utilidades -> servicios -> app (con defer para esperar DOM) -->
   <script defer src="../assets/js/utils.js"></script>
   <script defer src="../assets/js/services/StorageService.js"></script>
   <script defer src="../assets/js/services/ValidationService.js"></script>
@@ -14,9 +17,6 @@
   <script defer src="../assets/js/productService.js"></script>
   <script defer src="../assets/js/storeService.js"></script>
   <script defer src="../assets/js/app.js"></script>
-  <!-- Supabase client (local) and initialization -->
-  <script defer src="../assets/vendor/supabase.min.js"></script>
-  <script defer src="../assets/js/supabaseClient.js"></script>
 </head>
 <body>
   <div class="cliente-layout">

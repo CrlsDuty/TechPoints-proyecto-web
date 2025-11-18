@@ -1212,6 +1212,8 @@ function configurarModalProductoTienda() {
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto actualizado correctamente', 'success');
           cerrarModal();
+          // Simplemente recargar la lista (que ahora incluye el cambio en localStorage)
+          // Sin esperar a Supabase que podría tener datos viejos
           await mostrarProductosTienda(usuarioActivo.email);
         } else {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
