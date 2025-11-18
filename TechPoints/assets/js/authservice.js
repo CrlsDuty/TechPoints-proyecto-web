@@ -270,13 +270,19 @@ const AuthService = {
 
   // Obtener usuario activo
   obtenerUsuarioActivo() {
-    return StorageService.get('usuarioActivo', null);
+    const usuario = StorageService.get('usuarioActivo', null);
+    console.log('[AuthService] obtenerUsuarioActivo - Usuario recuperado:', usuario?.email, 'Historial:', usuario?.historial?.length || 0);
+    return usuario;
   },
 
   // Guardar usuario activo en sesión
   guardarUsuarioActivo(usuario) {
+    console.log('[AuthService] Guardando usuario activo:', usuario?.email, 'Historial:', usuario?.historial?.length || 0, 'Datos completos:', usuario);
     // Guardamos con expiración por defecto de 24 horas para sesiones
     StorageService.set('usuarioActivo', usuario, 24 * 60 * 60 * 1000);
+    // Verificar inmediatamente que se guardó
+    const verificacion = StorageService.get('usuarioActivo', null);
+    console.log('[AuthService] Verificación post-guardado:', verificacion?.email, 'Historial:', verificacion?.historial?.length || 0);
   },
 
   // Cerrar sesión
@@ -313,6 +319,51 @@ const AuthService = {
   buscarUsuarioPorEmail(email) {
     const usuarios = this.obtenerUsuarios();
     return usuarios.find(u => u.email === email);
+  },
+
+  // Cargar historial de canjes desde Supabase
+  async cargarHistorialDesdeSupabase(usuarioId) {
+    if (!this.isSupabaseEnabled() || !usuarioId) {
+      console.log('[AuthService] Supabase no disponible o usuarioId faltante, historial vacío');
+      return [];
+    }
+
+    try {
+      console.log('[AuthService] Cargando historial de canjes desde Supabase...');
+      
+      // Obtener redemptions del usuario
+      const url = `${window.supabase.url}/rest/v1/redemptions?perfil_id=eq.${usuarioId}&select=*,products(nombre,tienda_id)&order=creado_at.desc`;
+      const headers = {
+        'apikey': window.supabase._anonKey,
+        'Content-Type': 'application/json'
+      };
+
+      const response = await fetch(url, { headers });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn('[AuthService] Error cargando redemptions:', errorText);
+        return [];
+      }
+
+      const redemptions = await response.json();
+      console.log('[AuthService] Redemptions cargados:', redemptions.length);
+
+      // Mapear redemptions a formato de historial
+      return (redemptions || []).map(r => ({
+        fecha: new Date(r.creado_at).toLocaleDateString(),
+        fechaHora: r.creado_at,
+        tipo: 'canje',
+        producto: r.products?.nombre || 'Producto desconocido',
+        costo: r.puntos_usados,
+        puntos: r.puntos_usados,
+        tienda: 'Tienda',
+        descripcion: `Canjeaste ${r.products?.nombre || 'un producto'} por ${r.puntos_usados} puntos`
+      }));
+    } catch (e) {
+      console.warn('[AuthService] Error en cargarHistorialDesdeSupabase:', e.message);
+      return [];
+    }
   }
 };
 
