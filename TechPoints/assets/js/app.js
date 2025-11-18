@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ========== INICIALIZAR SEGÚN LA PÁGINA ==========
-function inicializarPagina() {
+async function inicializarPagina() {
   const usuarioActivo = AuthService.obtenerUsuarioActivo();
 
   // LOGIN
@@ -61,7 +61,7 @@ function inicializarPagina() {
 
   // CLIENTE
   if (usuarioActivo?.role === "cliente") {
-    inicializarCliente(usuarioActivo);
+    await inicializarCliente(usuarioActivo);
   }
 
   // TIENDA
@@ -72,7 +72,7 @@ function inicializarPagina() {
 
 // ========== LOGIN ==========
 function inicializarLogin(formLogin) {
-  formLogin.addEventListener("submit", e => {
+  formLogin.addEventListener("submit", async e => {
     e.preventDefault();
     
     const email = document.getElementById("email").value.trim();
@@ -83,22 +83,41 @@ function inicializarLogin(formLogin) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Iniciando...';
 
-    const resultado = AuthService.validarLogin(email, password);
+    // Usar signIn (que intenta Supabase primero)
+    const resultado = await AuthService.signIn(email, password);
 
     if (resultado.success) {
+      console.log('[App] Login exitoso con usuario:', resultado.usuario);
       AuthService.guardarUsuarioActivo(resultado.usuario);
+      
+      // Guardar usuario en Supabase auth para que getUser() funcione en otras páginas
+      if (typeof window.supabase !== 'undefined' && window.supabase.auth && window.supabase.auth._setUser) {
+        const userObj = {
+          id: resultado.usuario.id || ('local-' + btoa(email).substring(0, 20)),
+          email: resultado.usuario.email || email,
+          role: resultado.usuario.role,
+          puntos: resultado.usuario.puntos
+        };
+        window.supabase.auth._setUser(userObj);
+        console.log('[App] Usuario guardado en Supabase auth:', userObj);
+      }
+      
       // Emitir evento global de login para que otros módulos reaccionen
       if (window.EventBus && typeof EventBus.emit === 'function') {
         try { EventBus.emit('usuario-login', resultado.usuario); } catch (e) { console.warn('EventBus emit failed (login)', e); }
       }
       
       // Redirigir según el rol
-      if (resultado.usuario.role === "cliente") {
+      const role = resultado.usuario.role;
+      if (role === "cliente") {
         window.location.href = "cliente.html";
-      } else {
+      } else if (role === "tienda") {
         window.location.href = "tienda.html";
+      } else {
+        window.location.href = "index.html";
       }
     } else {
+      console.error('[App] Login falló:', resultado.message);
       if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Iniciar Sesión';
@@ -236,9 +255,9 @@ function inicializarRegistro(formRegistro) {
 // Constante: Ratio de conversión puntos/dólar (ajustable según negocio)
 const CONVERSION_RATIO = 1; // 1 punto = $1 dólar (puedes cambiar este valor)
 
-function inicializarCliente(usuarioActivo) {
+async function inicializarCliente(usuarioActivo) {
   actualizarInfoCliente(usuarioActivo);
-  mostrarProductosDisponibles();
+  await mostrarProductosDisponibles();
   mostrarHistorial();
   configurarModal();
 }
@@ -246,10 +265,79 @@ function inicializarCliente(usuarioActivo) {
 function actualizarInfoCliente(usuario) {
   const resultado = document.getElementById("resultado");
   if (resultado) {
-    resultado.innerHTML = `
-      <strong>👤 ${usuario.email}</strong><br>
-      💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
-    `;
+    // Cargar puntos desde Supabase si está disponible
+    if (typeof window.supabase !== 'undefined' && window.supabase) {
+      // Get current user from auth session
+      const authResult = window.supabase.auth && window.supabase.auth.getUser && window.supabase.auth.getUser();
+      const authUser = authResult && authResult.data && authResult.data.user;
+      const userId = authUser && authUser.id;
+      
+      console.log('[App] Current auth user:', authUser);
+      console.log('[App] Current user ID:', userId);
+      
+      // Check if this is a local fallback user (ID starts with 'local-')
+      const isLocalUser = userId && typeof userId === 'string' && userId.startsWith('local-');
+      
+      if (userId && !isLocalUser) {
+        // Query profile by ID from Supabase (only for real Supabase users)
+        window.supabase
+          .from('profiles')
+          .select('puntos, email')
+          .eq('id', userId)
+          .then((res) => {
+            console.log('[App] Profiles query response:', res);
+            const { data, error } = res;
+            if (!error && data) {
+              // data could be single object or array depending on if .single() was used
+              const profileData = Array.isArray(data) ? data[0] : data;
+              if (profileData) {
+                const puntos = parseInt(profileData.puntos) || 0;
+                console.log('[App] Puntos cargados de Supabase:', puntos, 'para usuario:', profileData.email);
+                resultado.innerHTML = `
+                  <strong>👤 ${usuario.email}</strong><br>
+                  💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${puntos}</strong>
+                `;
+                // Actualizar en memoria también
+                usuario.puntos = puntos;
+                AuthService.guardarUsuarioActivo(usuario);
+              } else {
+                console.warn('[App] No profile data found');
+                resultado.innerHTML = `
+                  <strong>👤 ${usuario.email}</strong><br>
+                  💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
+                `;
+              }
+            } else {
+              console.warn('[App] Error cargando puntos:', error?.message);
+              // Fallback si hay error
+              resultado.innerHTML = `
+                <strong>👤 ${usuario.email}</strong><br>
+                💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
+              `;
+            }
+          })
+          .catch(err => {
+            console.error('[App] Error en query profiles:', err);
+            // Mostrar datos del usuario local como fallback
+            resultado.innerHTML = `
+              <strong>👤 ${usuario.email}</strong><br>
+              💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
+            `;
+          });
+      } else {
+        // Es un usuario local o no hay userId, solo mostrar desde usuario actual
+        console.log('[App] Usuario local (fallback):', isLocalUser ? 'Sí' : 'No hay userId');
+        resultado.innerHTML = `
+          <strong>👤 ${usuario.email}</strong><br>
+          💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
+        `;
+      }
+    } else {
+      resultado.innerHTML = `
+        <strong>👤 ${usuario.email}</strong><br>
+        💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
+      `;
+    }
   }
 }
 
@@ -263,8 +351,8 @@ function convertirPuntosADolares(puntos) {
   return (puntos / CONVERSION_RATIO).toFixed(2);
 }
 
-function mostrarProductosDisponibles() {
-  const productos = ProductService.obtenerProductos();
+async function mostrarProductosDisponibles() {
+  const productos = await ProductService.obtenerProductos();
   const contenedor = document.getElementById("productosDisponibles");
   
   if (!contenedor) return;
@@ -282,9 +370,10 @@ function mostrarProductosDisponibles() {
   }
 
   productos.forEach((producto, index) => {
-    const puntosConvertidos = convertirDolaresAPuntos(producto.precioDolar || producto.costo);
-    const dolares = producto.precioDolar || convertirPuntosADolares(producto.costo);
-    const sinStock = (producto.stock || 0) <= 0;
+    // Mapear campos Supabase - usar ambos valores independientemente
+    const precioDolar = parseFloat(producto.precio_dolar) || 0;
+    const costoPuntos = parseInt(producto.costo_puntos) || 0;
+    const sinStock = (parseInt(producto.stock) || 0) <= 0;
     
     const card = document.createElement("div");
     card.className = "producto-card";
@@ -297,15 +386,15 @@ function mostrarProductosDisponibles() {
     
     card.innerHTML = `
       <h3 class="producto-nombre">${producto.nombre}</h3>
-      <p class="producto-tienda">Por ${producto.tienda}</p>
+      <p class="producto-tienda">Por ${producto.tienda_nombre || producto.tienda || 'Tienda desconocida'}</p>
       <div class="producto-precios">
         <div class="precio-dolar">
           <span class="label">Precio:</span>
-          <span class="valor">$${dolares}</span>
+          <span class="valor">$${precioDolar.toFixed(2)}</span>
         </div>
         <div class="precio-puntos">
           <span class="label">Puntos:</span>
-          <span class="valor">${puntosConvertidos} pts</span>
+          <span class="valor">${costoPuntos} pts</span>
         </div>
       </div>
       ${sinStock ? `<div style="color: #ef4444; font-weight: 600; text-align: center; padding: 8px; background: #fee2e2; border-radius: 4px; margin-bottom: 8px;">❌ Sin Stock</div>` : ''}
@@ -313,7 +402,7 @@ function mostrarProductosDisponibles() {
     `;
     
     if (!sinStock) {
-      card.onclick = () => abrirModalProducto(producto, index, puntosConvertidos, dolares);
+      card.onclick = () => abrirModalProducto(producto, index, costoPuntos, precioDolar);
     }
     
     contenedor.appendChild(card);
@@ -479,15 +568,17 @@ function mostrarInfoTienda(usuarioActivo) {
   }
 
   // También podemos mostrar estadísticas simples de la tienda si existen
-  try {
-    const stats = StoreService.obtenerEstadisticas(usuarioActivo.email);
-    if (stats) {
-      // por ahora solo logueamos; se puede extender la UI para mostrar estas métricas
-      console.log('Estadísticas de la tienda:', stats);
+  (async () => {
+    try {
+      const stats = await StoreService.obtenerEstadisticas(usuarioActivo.email);
+      if (stats) {
+        // por ahora solo logueamos; se puede extender la UI para mostrar estas métricas
+        console.log('Estadísticas de la tienda:', stats);
+      }
+    } catch (err) {
+      console.warn('No se pudieron obtener estadísticas de la tienda', err);
     }
-  } catch (err) {
-    console.warn('No se pudieron obtener estadísticas de la tienda', err);
-  }
+  })();
 }
 
 function configurarEditarPerfil(usuarioActivo) {
@@ -602,7 +693,10 @@ function configurarFormularioProductos(usuarioActivo) {
   const formProducto = document.getElementById("formProducto");
   if (!formProducto) return;
 
-  mostrarProductosTienda(usuarioActivo.email);
+  // Call async function without blocking
+  (async () => {
+    await mostrarProductosTienda(usuarioActivo.email);
+  })();
 
   // Imagen: solo subir archivo (dataURL)
   const imagenProdFile = document.getElementById('imagenProdFile');
@@ -693,7 +787,7 @@ function configurarFormularioProductos(usuarioActivo) {
           imagenProdDataUrl = null;
           mostrarPreviewElemento(imagenProdPreview, '');
           if (imagenProdClear) imagenProdClear.style.display = 'none';
-          mostrarProductosTienda(usuarioActivo.email);
+          await mostrarProductosTienda(usuarioActivo.email);
         } else {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
         }
@@ -708,8 +802,8 @@ function configurarFormularioProductos(usuarioActivo) {
   });
 }
 
-function mostrarProductosTienda(tiendaEmail) {
-  const productos = ProductService.obtenerProductosPorTienda(tiendaEmail);
+async function mostrarProductosTienda(tiendaEmail) {
+  const productos = await ProductService.obtenerProductosPorTienda(tiendaEmail);
   const lista = document.getElementById("listaProductos");
   
   if (!lista) return;
@@ -743,11 +837,17 @@ function mostrarProductosTienda(tiendaEmail) {
       contenido += `<br><span style="font-size: 0.85em; color: #666;">${producto.descripcion}</span>`;
     }
     
-    if (producto.precioDolar) {
-      contenido += `<br><span style="font-size: 0.9em; color: #059669;">$${parseFloat(producto.precioDolar).toFixed(2)}</span>`;
+    // Map Supabase field names (precio_dolar, costo_puntos) to display
+    const precioDolar = producto.precio_dolar || producto.precioDolar;
+    const costoPuntos = producto.costo_puntos || producto.costo;
+    
+    if (precioDolar) {
+      contenido += `<br><span style="font-size: 0.9em; color: #059669;">$${parseFloat(precioDolar).toFixed(2)}</span>`;
     }
     
-    contenido += `<br><span style="font-size: 0.85em; color: #0ea5e9; font-weight: 600;">${producto.costo} puntos</span>`;
+    if (costoPuntos) {
+      contenido += `<br><span style="font-size: 0.85em; color: #0ea5e9; font-weight: 600;">${costoPuntos} puntos</span>`;
+    }
     
     // Mostrar stock
     const stockText = sinStock ? `<span style="color: #ef4444; font-weight: 600;">Sin stock</span>` : `Stock: ${producto.stock}`;
@@ -755,14 +855,14 @@ function mostrarProductosTienda(tiendaEmail) {
     
     li.innerHTML = contenido;
     
-    // Guardar datos del producto en data attributes
+    // Guardar datos del producto en data attributes (map both Supabase and legacy field names)
     li.dataset.productoId = producto.id;
-    li.dataset.tienda = producto.tienda;
+    li.dataset.tienda = producto.tienda || producto.tienda_id;
     li.dataset.nombre = producto.nombre;
-    li.dataset.costo = producto.costo;
-    li.dataset.precioDolar = producto.precioDolar || '';
+    li.dataset.costo = costoPuntos || producto.costo || 0;
+    li.dataset.precioDolar = precioDolar || '';
     li.dataset.descripcion = producto.descripcion || '';
-    li.dataset.imagen = producto.imagen || '';
+    li.dataset.imagen = producto.imagen || producto.imagen_url || '';
     li.dataset.stock = producto.stock || 0;
     
     // Abrir modal al hacer clic
@@ -972,20 +1072,25 @@ function abrirModalProductoTienda(producto) {
   productoTiendaActual = producto;
   const modal = document.getElementById('modalProductoTienda');
   
+  // Map Supabase field names to display fields (handle both old and new naming)
+  const costoPuntos = producto.costo_puntos || producto.costo;
+  const precioDolar = producto.precio_dolar || producto.precioDolar;
+  const imagen = producto.imagen_url || producto.imagen;
+  
   // Llenar formulario con datos del producto
   document.getElementById('editProductoNombre').value = producto.nombre;
   document.getElementById('editProductoDescripcion').value = producto.descripcion || '';
-  document.getElementById('editProductoCosto').value = producto.costo;
+  document.getElementById('editProductoCosto').value = costoPuntos || 0;
   document.getElementById('editProductoStock').value = producto.stock || 0;
-  document.getElementById('editProductoPrecio').value = producto.precioDolar || '';
+  document.getElementById('editProductoPrecio').value = precioDolar || '';
   
   // Mostrar preview en modal de edición
   const editImgFile = document.getElementById('editProductoImagenFile');
   const editImgPreview = document.getElementById('editProductoImagenPreview');
   const editImgClear = document.getElementById('editProductoImagenClear');
   if (editImgFile) editImgFile.value = '';
-  if (producto.imagen) {
-    if (editImgPreview) editImgPreview.innerHTML = `<img src="${producto.imagen}" alt="Preview" style="max-width:180px; max-height:120px; border-radius:6px; display:block;">`;
+  if (imagen) {
+    if (editImgPreview) editImgPreview.innerHTML = `<img src="${imagen}" alt="Preview" style="max-width:180px; max-height:120px; border-radius:6px; display:block;">`;
     if (editImgClear) editImgClear.style.display = 'inline-block';
   } else {
     if (editImgPreview) editImgPreview.innerHTML = '';
@@ -1107,7 +1212,7 @@ function configurarModalProductoTienda() {
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto actualizado correctamente', 'success');
           cerrarModal();
-          mostrarProductosTienda(usuarioActivo.email);
+          await mostrarProductosTienda(usuarioActivo.email);
         } else {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
         }
@@ -1134,7 +1239,7 @@ function configurarModalProductoTienda() {
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto eliminado correctamente', 'success');
           cerrarModal();
-          mostrarProductosTienda(usuarioActivo.email);
+          await mostrarProductosTienda(usuarioActivo.email);
         } else {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
         }

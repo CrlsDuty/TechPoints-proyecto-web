@@ -25,6 +25,87 @@ const AuthService = {
     }
   },
 
+  // Devuelve true si hay un cliente Supabase inicializado (usar supabase en frontend)
+  isSupabaseEnabled() {
+    return typeof window.supabase !== 'undefined' && window.supabase !== null;
+  },
+
+  // Iniciar sesión usando Supabase cuando esté disponible; si no, fallback local
+  async signIn(email, password) {
+    if (!this.isSupabaseEnabled()) {
+      return this.validarLogin(email, password);
+    }
+
+    try {
+      console.log('[AuthService] Intentando signIn con Supabase para:', email);
+      const { data, error } = await window.supabase.auth.signInWithPassword({ email, password });
+      console.log('[AuthService] signInWithPassword response:', { data, error });
+      
+      // Si Supabase Auth falla, intentar fallback local
+      if (error || !data?.user?.id) {
+        console.warn('[AuthService] Supabase Auth falló, intentando fallback local:', error?.message);
+        return this.validarLogin(email, password);
+      }
+
+      const userId = data.user.id;
+      console.log('[AuthService] userId obtenido:', userId);
+      
+      // Use .single() to get single row
+      const profileResult = await window.supabase.from('profiles').select('*').eq('id', userId).single();
+      console.log('[AuthService] profileResult:', profileResult);
+      
+      const { data: profile, error: pErr } = profileResult;
+      if (pErr) {
+        console.warn('[AuthService] Error cargando profiles, intentando fallback local:', pErr.message);
+        return this.validarLogin(email, password);
+      }
+      
+      if (!profile) {
+        console.warn('[AuthService] Perfil no encontrado, intentando fallback local');
+        return this.validarLogin(email, password);
+      }
+
+      StorageService.set('usuarioActivo', profile, 24 * 60 * 60 * 1000);
+      console.log('[AuthService] Login exitoso via Supabase, perfil cargado:', profile);
+      return { success: true, usuario: profile };
+    } catch (e) {
+      console.error('[AuthService] Error en signIn, usando fallback local:', e);
+      return this.validarLogin(email, password);
+    }
+  },
+
+  // Registrar usando Supabase cuando esté disponible; si no, fallback local
+  async signUp(email, password, role, tiendaInfo = null) {
+    if (!this.isSupabaseEnabled()) {
+      return this.registrarUsuario(email, password, role, tiendaInfo);
+    }
+
+    try {
+      const { data, error } = await window.supabase.auth.signUp({ email, password });
+      if (error) return { success: false, message: error.message };
+
+      const userId = data?.user?.id;
+      if (!userId) return { success: false, message: 'No se obtuvo id de usuario' };
+
+      const profile = {
+        id: userId,
+        email,
+        role,
+        nombre: role === 'cliente' ? '' : (tiendaInfo?.nombre || ''),
+        puntos: role === 'cliente' ? (window.Config?.PUNTOS?.BONUS_REGISTRO || 0) : 0,
+        metadata: tiendaInfo || {}
+      };
+
+      const { error: pErr } = await window.supabase.from('profiles').insert([profile]);
+      if (pErr) return { success: false, message: pErr.message };
+
+      StorageService.set('usuarioActivo', profile, 24 * 60 * 60 * 1000);
+      return { success: true, message: 'Usuario registrado', usuario: profile };
+    } catch (e) {
+      return { success: false, message: e.message || 'Error en signUp' };
+    }
+  },
+
   // Validar credenciales de login
   validarLogin(email, password) {
     if (!email || !password) {
@@ -38,7 +119,7 @@ const AuthService = {
       return { success: true, usuario };
     }
     
-    return { success: false, message: "Credenciales incorrectas" };
+    return { success: false, message: "Credenciales incorrectos" };
   },
 
   // Registrar nuevo usuario

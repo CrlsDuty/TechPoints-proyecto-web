@@ -1,40 +1,92 @@
 // services/productService.js
 // Servicio de productos - maneja toda la lógica de productos
+// Adaptado para usar Supabase cuando está disponible, con fallback a localStorage
 
 const ProductService = {
-  // Obtener todos los productos
-  obtenerProductos() {
+  // Devuelve true si Supabase está habilitado
+  isSupabaseEnabled() {
+    return typeof window.supabase !== 'undefined' && window.supabase !== null;
+  },
+
+  // Obtener todos los productos desde Supabase o localStorage
+  async obtenerProductos() {
+    if (this.isSupabaseEnabled()) {
+      try {
+        // Seleccionar productos con info de la tienda (JOIN)
+        const { data, error } = await window.supabase
+          .from('products')
+          .select('*, stores(nombre)')
+          .order('creado_at', { ascending: false });
+        if (error) throw error;
+        
+        // Mapear datos para que tengan estructura esperada por app.js
+        return (data || []).map(p => ({
+          ...p,
+          tienda_nombre: p.stores?.nombre || 'Tienda desconocida'
+        }));
+      } catch (e) {
+        console.error('[ProductService] Error obteniendo productos de Supabase:', e);
+        return StorageService.get('productos', []) || [];
+      }
+    }
     return StorageService.get('productos', []) || [];
   },
 
-  // Guardar productos
+  // Guardar productos en localStorage (fallback)
   guardarProductos(productos) {
     StorageService.set('productos', productos);
   },
 
   // Agregar nuevo producto
-  agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = 0) {
-    // Retorna una Promise para demostrar operaciones asíncronas
+  async agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = 0) {
+    if (this.isSupabaseEnabled()) {
+      try {
+        // Obtener tienda del propietario autenticado
+        const { data: stores, error: storeError } = await window.supabase
+          .from('stores')
+          .select('id')
+          .eq('owner_id', (await window.supabase.auth.getUser()).data.user?.id)
+          .single();
+
+        if (storeError || !stores) {
+          return { success: false, message: 'No tienes una tienda registrada' };
+        }
+
+        const nuevoProducto = {
+          tienda_id: stores.id,
+          nombre: nombre.trim(),
+          descripcion: descripcion ? descripcion.trim() : null,
+          costo_puntos: parseInt(costo),
+          precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
+          imagen_url: imagen ? imagen.trim() : null,
+          stock: parseInt(stock) || 0
+        };
+
+        const { data, error } = await window.supabase.from('products').insert([nuevoProducto]).select();
+        if (error) throw error;
+
+        return { success: true, producto: data[0] };
+      } catch (e) {
+        console.error('[ProductService] Error agregando producto a Supabase:', e);
+        return { success: false, message: e.message };
+      }
+    }
+
+    // Fallback: localStorage
     return new Promise(async (resolve) => {
-      // Simular delay
       if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(300);
 
-      // Validaciones
       if (!nombre || !costo) {
-        return resolve({ success: false, message: "Nombre y costo son requeridos" });
+        return resolve({ success: false, message: 'Nombre y costo son requeridos' });
       }
 
       if (costo <= 0) {
-        return resolve({ success: false, message: "El costo debe ser mayor a 0" });
-      }
-
-      if (stock < 0) {
-        return resolve({ success: false, message: "El stock no puede ser negativo" });
+        return resolve({ success: false, message: 'El costo debe ser mayor a 0' });
       }
 
       const productos = this.obtenerProductos();
       const nuevoProducto = {
-        id: Date.now(), // ID único basado en timestamp
+        id: Date.now(),
         tienda: tiendaEmail,
         nombre: nombre.trim(),
         costo: parseInt(costo),
@@ -46,51 +98,160 @@ const ProductService = {
 
       productos.push(nuevoProducto);
       this.guardarProductos(productos);
-
       return resolve({ success: true, producto: nuevoProducto });
     });
   },
 
   // Obtener productos de una tienda específica
-  obtenerProductosPorTienda(tiendaEmail) {
-    const productos = this.obtenerProductos();
-    return productos.filter(p => p.tienda === tiendaEmail);
+  async obtenerProductosPorTienda(tiendaEmail) {
+    if (this.isSupabaseEnabled()) {
+      try {
+        // En Supabase buscamos por tienda_id
+        const { data: stores, error: storesError } = await window.supabase
+          .from('stores')
+          .select('id')
+          .limit(1);
+        
+        if (storesError || !stores || stores.length === 0) {
+          console.warn('[ProductService] No stores found or error:', storesError);
+          // Fallback to localStorage
+          return StorageService.get('productos', []).filter(p => p.tienda === tiendaEmail);
+        }
+
+        const tiendaId = stores[0].id;
+        // Query products by tienda_id
+        const { data: productos, error } = await window.supabase
+          .from('products')
+          .select('*')
+          .eq('tienda_id', tiendaId);
+        
+        if (error) {
+          console.warn('[ProductService] Error fetching products by tienda:', error);
+          // Fallback to localStorage
+          return StorageService.get('productos', []).filter(p => p.tienda === tiendaEmail);
+        }
+        
+        return productos || [];
+      } catch (e) {
+        console.warn('[ProductService] Error filtrando por tienda:', e);
+        // Fallback to localStorage
+        return StorageService.get('productos', []).filter(p => p.tienda === tiendaEmail);
+      }
+    }
+
+    // Fallback: localStorage
+    return StorageService.get('productos', []).filter(p => p.tienda === tiendaEmail);
   },
 
-  // Canjear producto (reducir puntos del cliente)
-  canjearProducto(clienteEmail, productoIndex) {
-    // Retorna una Promise para poder usar async/await
+  // Canjear producto (reducir puntos del cliente, decrementar stock)
+  async canjearProducto(clienteEmail, productoIndex) {
+    if (this.isSupabaseEnabled()) {
+      try {
+        // Obtener perfil del cliente
+        const { data: perfil, error: perfilError } = await window.supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', clienteEmail)
+          .single();
+
+        if (perfilError || !perfil) {
+          return { success: false, message: 'Cliente no encontrado' };
+        }
+
+        // Obtener producto
+        const productos = await this.obtenerProductos();
+        const producto = productos[productoIndex];
+
+        if (!producto) {
+          return { success: false, message: 'Producto no encontrado' };
+        }
+
+        // Llamar función RPC canjear_producto para operación atómica
+        const { data, error } = await window.supabase.rpc('canjear_producto', {
+          p_perfil_id: perfil.id,
+          p_producto_id: producto.id
+        });
+
+        if (error) {
+          return { success: false, message: error.message };
+        }
+
+        if (!data[0].success) {
+          return { 
+            success: false, 
+            message: data[0].message,
+            puntosActuales: data[0].puntos_restantes,
+            stockRestante: data[0].stock_restante
+          };
+        }
+
+        // Registrar transacción localmente (auditoría)
+        if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+          try {
+            TransactionService.registrarTransaccion('canje', {
+              cliente: clienteEmail,
+              producto: producto.nombre,
+              puntos: producto.costo_puntos,
+              tienda: producto.tienda_id
+            });
+          } catch (e) {
+            console.warn('Failed to register transaction (canje)', e);
+          }
+        }
+
+        // Emitir eventos
+        if (window.EventBus && typeof EventBus.emit === 'function') {
+          try {
+            EventBus.emit('producto-canjeado', {
+              cliente: perfil,
+              producto,
+              timestamp: new Date()
+            });
+          } catch (e) {
+            console.warn('EventBus emit failed (producto-canjeado)', e);
+          }
+        }
+
+        return {
+          success: true,
+          message: `¡Canje exitoso! Has canjeado ${producto.nombre}`,
+          puntosRestantes: data[0].puntos_restantes,
+          stockRestante: data[0].stock_restante
+        };
+      } catch (e) {
+        console.error('[ProductService] Error canjeando producto:', e);
+        return { success: false, message: e.message };
+      }
+    }
+
+    // Fallback: localStorage (operación local, menos segura)
     return new Promise(async (resolve) => {
       if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(250);
 
-      const productos = this.obtenerProductos();
+      const productos = await this.obtenerProductos();
       const producto = productos[productoIndex];
 
       if (!producto) {
-        return resolve({ success: false, message: "Producto no encontrado" });
+        return resolve({ success: false, message: 'Producto no encontrado' });
       }
 
-      // Obtener cliente
       const cliente = AuthService.buscarUsuarioPorEmail(clienteEmail);
-      
+
       if (!cliente) {
-        return resolve({ success: false, message: "Cliente no encontrado" });
+        return resolve({ success: false, message: 'Cliente no encontrado' });
       }
 
-      // Verificar puntos suficientes
       if (cliente.puntos < producto.costo) {
-        return resolve({ 
-          success: false, 
-          message: "No tienes suficientes puntos para canjear este producto",
+        return resolve({
+          success: false,
+          message: 'No tienes suficientes puntos para canjear este producto',
           puntosNecesarios: producto.costo,
           puntosActuales: cliente.puntos
         });
       }
 
-      // Realizar canje
       cliente.puntos -= producto.costo;
       cliente.historial = cliente.historial || [];
-      // Añadir registro con fecha y timestamp ISO para trazabilidad
       const now = new Date();
       cliente.historial.push({
         producto: producto.nombre,
@@ -100,25 +261,18 @@ const ProductService = {
         tienda: producto.tienda
       });
 
-      // Verificar stock disponible
       if ((producto.stock || 0) <= 0) {
-        return resolve({ 
-          success: false, 
-          message: "Este producto no está disponible en stock",
+        return resolve({
+          success: false,
+          message: 'Este producto no está disponible en stock',
           sinStock: true
         });
       }
 
-      // Actualizar cliente
       const resultadoCliente = AuthService.actualizarUsuario(cliente);
-
-      // Decrementar stock del producto
       producto.stock = (producto.stock || 1) - 1;
-
-      // Guardar producto con stock actualizado
       this.guardarProductos(productos);
 
-      // Registrar transacción y emitir evento global
       if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
         try {
           TransactionService.registrarTransaccion('canje', {
@@ -133,18 +287,23 @@ const ProductService = {
       }
 
       if (window.EventBus && typeof EventBus.emit === 'function') {
-        try { EventBus.emit('producto-canjeado', { cliente, producto, timestamp: new Date() }); } catch (e) { console.warn('EventBus emit failed (producto-canjeado)', e); }
+        try {
+          EventBus.emit('producto-canjeado', { cliente, producto, timestamp: new Date() });
+        } catch (e) {
+          console.warn('EventBus emit failed (producto-canjeado)', e);
+        }
       }
+
       if (resultadoCliente.success) {
-        return resolve({ 
-          success: true, 
+        return resolve({
+          success: true,
           message: `¡Canje exitoso! Has canjeado ${producto.nombre}`,
-          cliente,
+          puntosRestantes: cliente.puntos,
           stockRestante: producto.stock
         });
       }
 
-      return resolve({ success: false, message: "Error al actualizar cliente" });
+      return resolve({ success: false, message: 'Error al actualizar cliente' });
     });
   },
 
@@ -164,31 +323,60 @@ const ProductService = {
   },
 
   // Actualizar producto (editar detalles incluyendo stock)
-  actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = null) {
+  async actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = null) {
+    if (this.isSupabaseEnabled()) {
+      try {
+        const actualizacion = {
+          nombre: nombre.trim(),
+          costo_puntos: parseInt(costo),
+          precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
+          descripcion: descripcion ? descripcion.trim() : null,
+          imagen_url: imagen ? imagen.trim() : null,
+          actualizado_at: new Date().toISOString()
+        };
+
+        if (stock !== null) {
+          actualizacion.stock = parseInt(stock);
+        }
+
+        const { data, error } = await window.supabase
+          .from('products')
+          .update(actualizacion)
+          .eq('id', productoId)
+          .select();
+
+        if (error) throw error;
+
+        return { success: true, producto: data[0], message: 'Producto actualizado correctamente' };
+      } catch (e) {
+        console.error('[ProductService] Error actualizando producto:', e);
+        return { success: false, message: e.message };
+      }
+    }
+
+    // Fallback: localStorage
     return new Promise(async (resolve) => {
       if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(200);
 
-      let productos = this.obtenerProductos();
+      let productos = await this.obtenerProductos();
       const index = productos.findIndex(p => p.id === productoId && p.tienda === tiendaEmail);
-      
+
       if (index === -1) {
-        return resolve({ success: false, message: "Producto no encontrado o no autorizado" });
+        return resolve({ success: false, message: 'Producto no encontrado o no autorizado' });
       }
 
-      // Validaciones
       if (!nombre || !costo) {
-        return resolve({ success: false, message: "Nombre y costo son requeridos" });
+        return resolve({ success: false, message: 'Nombre y costo son requeridos' });
       }
 
       if (costo <= 0) {
-        return resolve({ success: false, message: "El costo debe ser mayor a 0" });
+        return resolve({ success: false, message: 'El costo debe ser mayor a 0' });
       }
 
       if (stock !== null && stock < 0) {
-        return resolve({ success: false, message: "El stock no puede ser negativo" });
+        return resolve({ success: false, message: 'El stock no puede ser negativo' });
       }
 
-      // Actualizar producto
       productos[index] = {
         ...productos[index],
         nombre: nombre.trim(),
@@ -201,7 +389,7 @@ const ProductService = {
 
       this.guardarProductos(productos);
 
-      return resolve({ success: true, producto: productos[index], message: "Producto actualizado correctamente" });
+      return resolve({ success: true, producto: productos[index], message: 'Producto actualizado correctamente' });
     });
   }
 };
