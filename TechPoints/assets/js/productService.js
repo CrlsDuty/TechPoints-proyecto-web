@@ -61,7 +61,7 @@ const ProductService = {
   },
 
   // Agregar nuevo producto
-  async agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = 0) {
+  async agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagenFile = null, stock = 0) {
     if (this.isSupabaseEnabled()) {
       try {
         console.log('[ProductService] Intentando agregar producto a Supabase...');
@@ -72,7 +72,6 @@ const ProductService = {
         // Si es usuario local (fallback), usar localStorage
         if (!usuario || usuario.id?.startsWith('local-')) {
           console.log('[ProductService] Usuario local detected, usando fallback localStorage');
-          // Delegar a fallback
           throw new Error('Usuario local - usar fallback');
         }
 
@@ -88,13 +87,55 @@ const ProductService = {
           throw new Error('No tienda registrada - usar fallback');
         }
 
+        let imagenUrl = null;
+        let imagenPath = null;
+
+        // Si hay imagen, subirla a Storage PRIMERO
+        if (imagenFile) {
+          console.log('[ProductService] 📸 Subiendo imagen a Storage...');
+          
+          // Si es dataURL, convertir a File
+          if (typeof imagenFile === 'string') {
+            console.log('[ProductService] Detectado dataURL, subiendo desde dataURL...');
+            const uploadResult = await ImageStorageService.uploadFromDataUrl(
+              imagenFile,
+              stores.id,
+              'temp_' + Date.now() // ID temporal, será actualizado después
+            );
+            
+            if (uploadResult.success) {
+              imagenUrl = uploadResult.url;
+              imagenPath = uploadResult.path;
+              console.log('[ProductService] ✅ Imagen subida desde dataURL:', imagenUrl);
+            } else {
+              console.warn('[ProductService] ⚠️ Error subiendo imagen:', uploadResult.error);
+              // Continuar sin imagen si falla
+            }
+          } else if (imagenFile instanceof File) {
+            const uploadResult = await ImageStorageService.uploadImage(
+              imagenFile,
+              stores.id,
+              'temp_' + Date.now()
+            );
+            
+            if (uploadResult.success) {
+              imagenUrl = uploadResult.url;
+              imagenPath = uploadResult.path;
+              console.log('[ProductService] ✅ Imagen subida:', imagenUrl);
+            } else {
+              console.warn('[ProductService] ⚠️ Error subiendo imagen:', uploadResult.error);
+              // Continuar sin imagen si falla
+            }
+          }
+        }
+
         const nuevoProducto = {
           tienda_id: stores.id,
           nombre: nombre.trim(),
           descripcion: descripcion ? descripcion.trim() : null,
           costo_puntos: parseInt(costo),
           precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
-          imagen_url: imagen ? imagen.trim() : null,
+          imagen_url: imagenUrl, // URL de Storage, no dataURL
           stock: parseInt(stock) || 0
         };
 
@@ -121,12 +162,18 @@ const ProductService = {
         } else {
           const errorText = await response.text();
           console.warn('[ProductService] ⚠️ Error HTTP ' + response.status + ':', errorText);
+          
+          // Si el producto no se guardó pero la imagen sí, eliminarla
+          if (imagenPath) {
+            console.warn('[ProductService] Eliminando imagen que se subió pero no se usó...');
+            await ImageStorageService.deleteImage(imagenPath);
+          }
+          
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
       } catch (e) {
         console.error('[ProductService] Error agregando producto a Supabase:', e);
         console.log('[ProductService] Cayendo a fallback localStorage');
-        // Caer a fallback si hay error
       }
     }
 
@@ -511,12 +558,14 @@ const ProductService = {
     return { success: true, message: "Producto eliminado" };
   },
 
-  // Actualizar producto (editar detalles incluyendo stock)
-  async actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = null) {
+  // Actualizar producto (editar detalles incluyendo stock e imágenes)
+  async actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagenFileOrUrl = null, stock = null) {
     // Intentar actualizar en Supabase usando RPC function
     console.log('[ProductService] Actualizando producto en Supabase vía RPC...');
     
     let supabaseSuccess = false;
+    let imagenUrlFinal = null;
+    
     try {
       if (!window.supabase) {
         throw new Error('Supabase no está disponible');
@@ -535,6 +584,37 @@ const ProductService = {
         throw new Error('El stock no puede ser negativo');
       }
 
+      // Si hay nueva imagen (File), subirla primero
+      if (imagenFileOrUrl && imagenFileOrUrl instanceof File) {
+        console.log('[ProductService] 📸 Nueva imagen detectada, subiendo a Storage...');
+        
+        // Obtener tienda para subir imagen
+        const { data: stores, error: storeError } = await window.supabase
+          .from('stores')
+          .select('id')
+          .eq('owner_id', (await window.supabase.auth.getUser()).data?.user?.id)
+          .single();
+
+        if (!storeError && stores) {
+          const uploadResult = await ImageStorageService.uploadImage(
+            imagenFileOrUrl,
+            stores.id,
+            productoId
+          );
+
+          if (uploadResult.success) {
+            imagenUrlFinal = uploadResult.url;
+            console.log('[ProductService] ✅ Imagen subida:', imagenUrlFinal);
+          } else {
+            console.warn('[ProductService] ⚠️ Error subiendo imagen:', uploadResult.error);
+            // Continuar sin imagen si falla
+          }
+        }
+      } else if (typeof imagenFileOrUrl === 'string') {
+        // Si es string URL, usarla directamente (imagen existente)
+        imagenUrlFinal = imagenFileOrUrl;
+      }
+
       // Preparar datos para RPC
       const rpcParams = {
         p_id: productoId,
@@ -543,7 +623,7 @@ const ProductService = {
         p_precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
         p_stock: stock !== null ? parseInt(stock) : null,
         p_descripcion: descripcion ? descripcion.trim() : null,
-        p_imagen_url: imagen ? imagen.trim() : null
+        p_imagen_url: imagenUrlFinal || null
       };
 
       console.log('[ProductService] 🔄 Llamando RPC actualizar_producto con:', rpcParams);
@@ -574,17 +654,11 @@ const ProductService = {
       let productos = await this.obtenerProductos();
       
       // Buscar por ID del producto
-      // Cuando viene de Supabase: tienda === 'Supabase', buscar solo por ID
-      // Cuando viene de localStorage: tienda === email, validar también tienda
       const index = productos.findIndex(p => {
         const idMatch = p.id === productoId;
-        
-        // Si es de Supabase (tienda === 'Supabase'), buscar solo por ID
         if (p.tienda === 'Supabase') {
           return idMatch;
         }
-        
-        // Si es de localStorage, validar también tienda
         const tiendaMatch = p.tienda === tiendaEmail || p.owner_id;
         return idMatch && tiendaMatch;
       });

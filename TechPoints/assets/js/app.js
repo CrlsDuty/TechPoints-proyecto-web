@@ -757,12 +757,12 @@ function configurarFormularioProductos(usuarioActivo) {
     await mostrarProductosTienda(usuarioActivo.email);
   })();
 
-  // Imagen: solo subir archivo (dataURL)
+  // Imagen: Subir archivo a Supabase Storage
   const imagenProdFile = document.getElementById('imagenProdFile');
   const imagenProdPreview = document.getElementById('imagenProdPreview');
   const imagenProdClear = document.getElementById('imagenProdClear');
 
-  const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB (máximo de Storage)
 
   function mostrarPreviewElemento(container, src) {
     if (!container) return;
@@ -773,12 +773,12 @@ function configurarFormularioProductos(usuarioActivo) {
     container.innerHTML = `<img src="${src}" alt="Preview imagen" style="max-width: 180px; max-height: 120px; border-radius:6px; display:block;">`;
   }
 
-  // Si selecciona archivo, leer como dataURL y poner en variable global
-  let imagenProdDataUrl = null;
+  // Si selecciona archivo, crear preview y guardar archivo
+  let imagenProdFileSelected = null;
   imagenProdFile?.addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) {
-      imagenProdDataUrl = null;
+      imagenProdFileSelected = null;
       mostrarPreviewElemento(imagenProdPreview, '');
       imagenProdClear && (imagenProdClear.style.display = 'none');
       return;
@@ -786,21 +786,25 @@ function configurarFormularioProductos(usuarioActivo) {
     if (!file.type.startsWith('image/')) {
       if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Tipo de archivo no soportado. Selecciona una imagen.', 'warning');
       imagenProdFile.value = '';
-      imagenProdDataUrl = null;
+      imagenProdFileSelected = null;
       mostrarPreviewElemento(imagenProdPreview, '');
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Imagen demasiado grande (máx 2MB).', 'warning');
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Imagen demasiado grande (máx 5MB).', 'warning');
       imagenProdFile.value = '';
-      imagenProdDataUrl = null;
+      imagenProdFileSelected = null;
       mostrarPreviewElemento(imagenProdPreview, '');
       return;
     }
+    
+    // Guardar el archivo para subir después
+    imagenProdFileSelected = file;
+    
+    // Mostrar preview usando URL local
     const reader = new FileReader();
     reader.onload = function(evt) {
-      imagenProdDataUrl = evt.target.result;
-      mostrarPreviewElemento(imagenProdPreview, imagenProdDataUrl);
+      mostrarPreviewElemento(imagenProdPreview, evt.target.result);
       imagenProdClear && (imagenProdClear.style.display = 'inline-block');
     };
     reader.readAsDataURL(file);
@@ -808,7 +812,7 @@ function configurarFormularioProductos(usuarioActivo) {
 
   imagenProdClear?.addEventListener('click', () => {
     if (imagenProdFile) imagenProdFile.value = '';
-    imagenProdDataUrl = null;
+    imagenProdFileSelected = null;
     mostrarPreviewElemento(imagenProdPreview, '');
     imagenProdClear.style.display = 'none';
   });
@@ -820,7 +824,7 @@ function configurarFormularioProductos(usuarioActivo) {
     const costo = document.getElementById("costoProd").value.trim();
     const precioDolar = document.getElementById("precioDolarProd")?.value.trim() || null;
     const descripcion = document.getElementById("descripcionProd")?.value.trim() || null;
-    const imagen = imagenProdDataUrl || null;
+    const imagen = imagenProdFileSelected || null; // Pasar el File, no dataURL
     const stock = document.getElementById("stockProd")?.value.trim() || "0";
     const submitBtn = formProducto.querySelector('button[type="submit"]');
 
@@ -835,7 +839,7 @@ function configurarFormularioProductos(usuarioActivo) {
           costo, 
           precioDolar, 
           descripcion, 
-          imagen,
+          imagen, // Ahora es File o null
           stock
         );
 
@@ -843,7 +847,7 @@ function configurarFormularioProductos(usuarioActivo) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto agregado correctamente', 'success');
           formProducto.reset();
           document.getElementById("stockProd").value = "0";
-          imagenProdDataUrl = null;
+          imagenProdFileSelected = null;
           mostrarPreviewElemento(imagenProdPreview, '');
           if (imagenProdClear) imagenProdClear.style.display = 'none';
           await mostrarProductosTienda(usuarioActivo.email);
@@ -855,7 +859,7 @@ function configurarFormularioProductos(usuarioActivo) {
         if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Error inesperado al agregar producto', 'error');
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Agregar Producto';
+        submitBtn.textContent = '➕ Agregar Producto';
       }
     })();
   });
@@ -1184,17 +1188,17 @@ function configurarModalProductoTienda() {
     if (e.target === modal) cerrarModal();
   }, { once: true });
 
-  // Manejo de imagen en modal: solo archivo
+  // Manejo de imagen en modal: subir a Storage
   const editImgFileInput = document.getElementById('editProductoImagenFile');
   const editImgPreviewEl = document.getElementById('editProductoImagenPreview');
   const editImgClearBtn = document.getElementById('editProductoImagenClear');
-  let editImgDataUrl = null;
+  let editImgFileSelected = null;
 
-  // Si se selecciona archivo, leer y convertir a dataURL
+  // Si se selecciona archivo, mostrar preview y guardar archivo
   editImgFileInput?.addEventListener('change', (ev) => {
     const file = ev.target.files && ev.target.files[0];
     if (!file) {
-      editImgDataUrl = null;
+      editImgFileSelected = null;
       editImgPreviewEl && (editImgPreviewEl.innerHTML = '');
       if (editImgClearBtn) editImgClearBtn.style.display = 'none';
       return;
@@ -1202,19 +1206,23 @@ function configurarModalProductoTienda() {
     if (!file.type.startsWith('image/')) {
       if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Tipo de archivo no soportado. Selecciona una imagen.', 'warning');
       editImgFileInput.value = '';
-      editImgDataUrl = null;
+      editImgFileSelected = null;
       return;
     }
-    if (file.size > (2 * 1024 * 1024)) {
-      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Imagen demasiado grande (máx 2MB).', 'warning');
+    if (file.size > (5 * 1024 * 1024)) { // 5MB
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Imagen demasiado grande (máx 5MB).', 'warning');
       editImgFileInput.value = '';
-      editImgDataUrl = null;
+      editImgFileSelected = null;
       return;
     }
+    
+    // Guardar archivo para subir después
+    editImgFileSelected = file;
+    
+    // Mostrar preview
     const reader = new FileReader();
     reader.onload = function(evt) {
-      editImgDataUrl = evt.target.result;
-      editImgPreviewEl && (editImgPreviewEl.innerHTML = `<img src="${editImgDataUrl}" alt="Preview" style="max-width:180px; max-height:120px; border-radius:6px; display:block;">`);
+      editImgPreviewEl && (editImgPreviewEl.innerHTML = `<img src="${evt.target.result}" alt="Preview" style="max-width:180px; max-height:120px; border-radius:6px; display:block;">`);
       if (editImgClearBtn) editImgClearBtn.style.display = 'inline-block';
     };
     reader.readAsDataURL(file);
@@ -1222,7 +1230,7 @@ function configurarModalProductoTienda() {
 
   editImgClearBtn?.addEventListener('click', () => {
     if (editImgFileInput) editImgFileInput.value = '';
-    editImgDataUrl = null;
+    editImgFileSelected = null;
     if (editImgPreviewEl) editImgPreviewEl.innerHTML = '';
     if (editImgClearBtn) editImgClearBtn.style.display = 'none';
   });
@@ -1236,7 +1244,7 @@ function configurarModalProductoTienda() {
       const costo = document.getElementById('editProductoCosto').value.trim();
       const precioDolar = document.getElementById('editProductoPrecio').value.trim() || null;
       const descripcion = document.getElementById('editProductoDescripcion').value.trim() || null;
-      const imagen = editImgDataUrl || productoTiendaActual.imagen || null;
+      const imagen = editImgFileSelected || productoTiendaActual.imagen_url || productoTiendaActual.imagen || null;
       const stock = document.getElementById('editProductoStock').value.trim() || 0;
       
       // Validaciones
@@ -1264,15 +1272,13 @@ function configurarModalProductoTienda() {
           costo,
           precioDolar,
           descripcion,
-          imagen,
+          imagen, // Ahora puede ser File o string URL
           stock
         );
         
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto actualizado correctamente', 'success');
           cerrarModal();
-          // Simplemente recargar la lista (que ahora incluye el cambio en localStorage)
-          // Sin esperar a Supabase que podría tener datos viejos
           await mostrarProductosTienda(usuarioActivo.email);
         } else {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
