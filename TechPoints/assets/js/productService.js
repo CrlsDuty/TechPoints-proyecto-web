@@ -13,29 +13,34 @@ const ProductService = {
     if (this.isSupabaseEnabled()) {
       try {
         console.log('[ProductService] Obteniendo productos de Supabase...');
-        // Simplificar query: sin joins que causen HTTP 400
-        const { data, error } = await window.supabase
-          .from('products')
-          .select('*')
-          .order('creado_at', { ascending: false });
         
-        if (error) {
-          console.error('[ProductService] Error de Supabase:', error.message);
-          // Mostrar toast al usuario
-          if (window.Utils && typeof Utils.mostrarToast === 'function') {
-            Utils.mostrarToast('⚠️ Usando datos locales (Supabase no disponible)', 'warning');
-          }
-          throw error;
+        // Usar PostgREST para hacer join y obtener nombre de tienda
+        const url = `${window.supabase.url}/rest/v1/products?select=*,stores(nombre,owner_id)`;
+        const headers = {
+          'apikey': window.supabase._anonKey,
+          'Content-Type': 'application/json'
+        };
+
+        const response = await fetch(url, { headers });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[ProductService] Error de Supabase:', errorText);
+          throw new Error('Error fetching products');
         }
-        
+
+        const data = await response.json();
         console.log('[ProductService] Productos obtenidos de Supabase:', data?.length || 0);
         
-        // Mapear datos - ya no necesitamos joins
+        // Mapear datos con nombre de tienda
         return (data || []).map(p => {
+          const tiendaNombre = p.stores?.nombre || 'Tienda desconocida';
           return {
             ...p,
-            tienda: 'Supabase',  // Marca que viene de Supabase
-            tienda_id: p.tienda_id
+            tienda_nombre: tiendaNombre,
+            tienda: tiendaNombre,
+            tienda_id: p.tienda_id,
+            owner_id: p.stores?.owner_id
           };
         });
       } catch (e) {
@@ -218,6 +223,8 @@ const ProductService = {
   async canjearProducto(clienteEmail, productoIndex) {
     if (this.isSupabaseEnabled()) {
       try {
+        console.log('[ProductService] Intentando canjear producto en Supabase...');
+        
         // Obtener perfil del cliente
         const { data: perfil, error: perfilError } = await window.supabase
           .from('profiles')
@@ -237,24 +244,95 @@ const ProductService = {
           return { success: false, message: 'Producto no encontrado' };
         }
 
-        // Llamar función RPC canjear_producto para operación atómica
-        const { data, error } = await window.supabase.rpc('canjear_producto', {
-          p_perfil_id: perfil.id,
-          p_producto_id: producto.id
-        });
-
-        if (error) {
-          return { success: false, message: error.message };
+        // Validar stock
+        if (producto.stock <= 0) {
+          return { success: false, message: 'Producto sin stock' };
         }
 
-        if (!data[0].success) {
-          return { 
-            success: false, 
-            message: data[0].message,
-            puntosActuales: data[0].puntos_restantes,
-            stockRestante: data[0].stock_restante
+        // Validar puntos suficientes
+        if (perfil.puntos < producto.costo_puntos) {
+          return {
+            success: false,
+            message: 'No tienes suficientes puntos para canjear este producto',
+            puntosNecesarios: producto.costo_puntos,
+            puntosActuales: perfil.puntos
           };
         }
+
+        // Actualizar puntos del cliente (restar puntos de canje)
+        const nuevosPuntos = perfil.puntos - producto.costo_puntos;
+        const profileUrl = `${window.supabase.url}/rest/v1/profiles?id=eq.${perfil.id}`;
+        const headers = {
+          'Content-Type': 'application/json',
+          'apikey': window.supabase._anonKey,
+          'Prefer': 'return=representation'
+        };
+
+        const profileUpdateData = {
+          puntos: nuevosPuntos,
+          actualizado_at: new Date().toISOString()
+        };
+
+        const profileResponse = await fetch(profileUrl, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(profileUpdateData)
+        });
+
+        if (!profileResponse.ok) {
+          const errorText = await profileResponse.text();
+          console.warn('[ProductService] Error actualizando puntos:', errorText);
+          return { success: false, message: 'Error al actualizar puntos' };
+        }
+
+        // Actualizar stock del producto (decrementar)
+        const nuevoStock = producto.stock - 1;
+        const productUrl = `${window.supabase.url}/rest/v1/products?id=eq.${producto.id}`;
+        const productUpdateData = {
+          stock: nuevoStock,
+          actualizado_at: new Date().toISOString()
+        };
+
+        const productResponse = await fetch(productUrl, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(productUpdateData)
+        });
+
+        if (!productResponse.ok) {
+          const errorText = await productResponse.text();
+          console.warn('[ProductService] Error actualizando stock:', errorText);
+          // No retornar error, el canje ya se registró
+        }
+
+        // Registrar redemption en Supabase
+        try {
+          console.log('[ProductService] Registrando redemption en Supabase...');
+          const redemptionUrl = `${window.supabase.url}/rest/v1/redemptions`;
+          const redemptionData = {
+            perfil_id: perfil.id,
+            producto_id: producto.id,
+            puntos_usados: producto.costo_puntos,
+            estado: 'completado'
+          };
+
+          const redemptionResponse = await fetch(redemptionUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(redemptionData)
+          });
+
+          if (redemptionResponse.ok) {
+            console.log('[ProductService] ✅ Redemption registrado en Supabase');
+          } else {
+            const errorText = await redemptionResponse.text();
+            console.warn('[ProductService] Error registrando redemption:', errorText);
+          }
+        } catch (e) {
+          console.warn('[ProductService] Error en redemption:', e.message);
+        }
+
+        console.log('[ProductService] ✅ Canje completado exitosamente');
 
         // Registrar transacción localmente (auditoría)
         if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
@@ -286,8 +364,14 @@ const ProductService = {
         return {
           success: true,
           message: `¡Canje exitoso! Has canjeado ${producto.nombre}`,
-          puntosRestantes: data[0].puntos_restantes,
-          stockRestante: data[0].stock_restante
+          cliente: {
+            ...perfil,
+            puntos: nuevosPuntos
+          },
+          puntosRestantes: nuevosPuntos,
+          stockRestante: nuevoStock,
+          producto: producto.nombre,
+          tienda: producto.tienda_nombre || producto.tienda || 'Tienda desconocida'
         };
       } catch (e) {
         console.error('[ProductService] Error canjeando producto:', e);
