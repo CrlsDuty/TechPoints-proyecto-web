@@ -90,6 +90,15 @@ function inicializarLogin(formLogin) {
       console.log('[App] Login exitoso con usuario:', resultado.usuario);
       AuthService.guardarUsuarioActivo(resultado.usuario);
       
+      // Cargar historial desde Supabase si es cliente
+      if (resultado.usuario.role === 'cliente' && resultado.usuario.id) {
+        console.log('[App] Cargando historial desde Supabase...');
+        const historial = await AuthService.cargarHistorialDesdeSupabase(resultado.usuario.id);
+        resultado.usuario.historial = historial;
+        AuthService.guardarUsuarioActivo(resultado.usuario);
+        console.log('[App] Historial cargado:', historial.length, 'canjes');
+      }
+      
       // Guardar usuario en Supabase auth para que getUser() funcione en otras páginas
       if (typeof window.supabase !== 'undefined' && window.supabase.auth && window.supabase.auth._setUser) {
         const userObj = {
@@ -262,83 +271,33 @@ async function inicializarCliente(usuarioActivo) {
   configurarModal();
 }
 
-function actualizarInfoCliente(usuario) {
-  const resultado = document.getElementById("resultado");
-  if (resultado) {
-    // Cargar puntos desde Supabase si está disponible
-    if (typeof window.supabase !== 'undefined' && window.supabase) {
-      // Get current user from auth session
-      const authResult = window.supabase.auth && window.supabase.auth.getUser && window.supabase.auth.getUser();
-      const authUser = authResult && authResult.data && authResult.data.user;
-      const userId = authUser && authUser.id;
-      
-      console.log('[App] Current auth user:', authUser);
-      console.log('[App] Current user ID:', userId);
-      
-      // Check if this is a local fallback user (ID starts with 'local-')
-      const isLocalUser = userId && typeof userId === 'string' && userId.startsWith('local-');
-      
-      if (userId && !isLocalUser) {
-        // Query profile by ID from Supabase (only for real Supabase users)
-        window.supabase
-          .from('profiles')
-          .select('puntos, email')
-          .eq('id', userId)
-          .then((res) => {
-            console.log('[App] Profiles query response:', res);
-            const { data, error } = res;
-            if (!error && data) {
-              // data could be single object or array depending on if .single() was used
-              const profileData = Array.isArray(data) ? data[0] : data;
-              if (profileData) {
-                const puntos = parseInt(profileData.puntos) || 0;
-                console.log('[App] Puntos cargados de Supabase:', puntos, 'para usuario:', profileData.email);
-                resultado.innerHTML = `
-                  <strong>👤 ${usuario.email}</strong><br>
-                  💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${puntos}</strong>
-                `;
-                // Actualizar en memoria también
-                usuario.puntos = puntos;
-                AuthService.guardarUsuarioActivo(usuario);
-              } else {
-                console.warn('[App] No profile data found');
-                resultado.innerHTML = `
-                  <strong>👤 ${usuario.email}</strong><br>
-                  💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
-                `;
-              }
-            } else {
-              console.warn('[App] Error cargando puntos:', error?.message);
-              // Fallback si hay error
-              resultado.innerHTML = `
-                <strong>👤 ${usuario.email}</strong><br>
-                💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
-              `;
-            }
-          })
-          .catch(err => {
-            console.error('[App] Error en query profiles:', err);
-            // Mostrar datos del usuario local como fallback
-            resultado.innerHTML = `
-              <strong>👤 ${usuario.email}</strong><br>
-              💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
-            `;
-          });
-      } else {
-        // Es un usuario local o no hay userId, solo mostrar desde usuario actual
-        console.log('[App] Usuario local (fallback):', isLocalUser ? 'Sí' : 'No hay userId');
-        resultado.innerHTML = `
-          <strong>👤 ${usuario.email}</strong><br>
-          💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
-        `;
-      }
-    } else {
-      resultado.innerHTML = `
-        <strong>👤 ${usuario.email}</strong><br>
-        💰 Puntos disponibles: <strong style="font-size: 1.3em; color: #0ea5e9;">${usuario.puntos || 0}</strong>
-      `;
-    }
+function actualizarInfoCliente(clienteData = null) {
+  const usuario = clienteData || AuthService.obtenerUsuarioActivo();
+
+  if (!usuario) {
+    console.warn('[App] No hay usuario activo');
+    return;
   }
+
+  const resultado = document.getElementById("resultado");
+  if (!resultado) return;
+
+  // Actualizar puntos si se pasan datos nuevos
+  if (clienteData && clienteData.puntos !== undefined) {
+    usuario.puntos = clienteData.puntos;
+    AuthService.guardarUsuarioActivo(usuario);
+  }
+
+  // Mostrar datos actualizados en la estructura del nuevo diseño
+  resultado.innerHTML = `
+    <div class="user-email">
+      <span>📧 ${usuario.email}</span>
+    </div>
+    <div class="puntos-disponibles">
+      <div class="label">Puntos Disponibles</div>
+      <div class="valor">${(usuario.puntos || 0).toLocaleString()}</div>
+    </div>
+  `;
 }
 
 // Función de conversión: dólares → puntos
@@ -354,8 +313,14 @@ function convertirPuntosADolares(puntos) {
 async function mostrarProductosDisponibles() {
   const productos = await ProductService.obtenerProductos();
   const contenedor = document.getElementById("productosDisponibles");
+  const contador = document.getElementById("productosCount");
   
   if (!contenedor) return;
+  
+  // Actualizar contador
+  if (contador) {
+    contador.textContent = `${productos.length} productos`;
+  }
   
   contenedor.innerHTML = "";
 
@@ -385,20 +350,24 @@ async function mostrarProductosDisponibles() {
     }
     
     card.innerHTML = `
-      <h3 class="producto-nombre">${producto.nombre}</h3>
-      <p class="producto-tienda">Por ${producto.tienda_nombre || producto.tienda || 'Tienda desconocida'}</p>
+      <div class="producto-imagen">Sin imagen</div>
+      <div class="producto-info">
+        <h3 class="producto-nombre">${producto.nombre}</h3>
+        <p class="producto-tienda">🏪 ${producto.tienda_nombre || producto.tienda || 'Tienda desconocida'}</p>
+        <p class="producto-descripcion">${producto.descripcion || 'Producto disponible para canje en nuestro sistema de puntos'}</p>
+        <div class="producto-stock">✓ ${sinStock ? 'Sin stock' : `${parseInt(producto.stock)} disponibles`}</div>
+      </div>
       <div class="producto-precios">
-        <div class="precio-dolar">
-          <span class="label">Precio:</span>
-          <span class="valor">$${precioDolar.toFixed(2)}</span>
+        <div class="precio-row">
+          <span class="precio-label">Precio:</span>
+          <span class="precio-valor">$${precioDolar.toFixed(2)}</span>
         </div>
-        <div class="precio-puntos">
-          <span class="label">Puntos:</span>
-          <span class="valor">${costoPuntos} pts</span>
+        <div class="precio-row">
+          <span class="precio-label">Puntos:</span>
+          <span class="precio-puntos">${costoPuntos.toLocaleString()} pts</span>
         </div>
       </div>
-      ${sinStock ? `<div style="color: #ef4444; font-weight: 600; text-align: center; padding: 8px; background: #fee2e2; border-radius: 4px; margin-bottom: 8px;">❌ Sin Stock</div>` : ''}
-      <button class="producto-btn" ${sinStock ? 'disabled' : ''}>Ver Detalles</button>
+      <button class="btn-canjear" ${sinStock ? 'disabled' : ''}>Canjear Ahora</button>
     `;
     
     if (!sinStock) {
@@ -416,11 +385,12 @@ function abrirModalProducto(producto, index, puntos, dolares) {
   
   // Llenar datos del modal
   document.getElementById("modalProductoNombre").textContent = producto.nombre;
+  document.getElementById("modalProductoTienda").textContent = `🏪 ${producto.tienda_nombre || producto.tienda || 'Tienda desconocida'}`;
   document.getElementById("modalProductoDescripcion").textContent = 
     producto.descripcion || "Producto disponible para canje en nuestro sistema de puntos";
-  document.getElementById("modalProductoPrecioDolar").textContent = `$${dolares}`;
-  document.getElementById("modalProductoPuntos").textContent = `${puntos} pts`;
-  document.getElementById("modalProductosPuntosCliente").textContent = `${usuarioActivo.puntos || 0} pts`;
+  document.getElementById("modalProductoPrecioDolar").textContent = `$${dolares.toFixed(2)}`;
+  document.getElementById("modalProductoPuntos").textContent = `${puntos.toLocaleString()} pts`;
+  document.getElementById("modalProductosPuntosCliente").textContent = `${(usuarioActivo.puntos || 0).toLocaleString()} pts`;
   
   // Mostrar imagen (placeholder si no hay)
   const imagenContainer = document.getElementById("modalProductoImagen");
@@ -430,15 +400,13 @@ function abrirModalProducto(producto, index, puntos, dolares) {
   
   // Mostrar estado de stock
   const stockContainer = document.getElementById("modalProductoStock");
-  if (!stockContainer) {
-    // Si no existe, crear dinámicamente después del modal
-    console.warn('modalProductoStock container no encontrado');
+  const stock = parseInt(producto.stock) || 0;
+  if (sinStock) {
+    stockContainer.textContent = '⚠️ Este producto no está disponible en stock';
+    stockContainer.style.color = '#ef4444';
   } else {
-    if (sinStock) {
-      stockContainer.innerHTML = '<div style="color: #ef4444; font-weight: 600; background: #fee2e2; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 16px;">⚠️ Este producto no está disponible en stock</div>';
-    } else {
-      stockContainer.innerHTML = '';
-    }
+    stockContainer.textContent = `✓ Disponibles: ${stock} unidades`;
+    stockContainer.style.color = '#059669';
   }
   
   // Configurar botón de canje
@@ -468,8 +436,72 @@ function confirmarCanjeDesdeModal(index, email, puntosRequeridos) {
       if (resultado.success) {
         cerrarModalProducto();
         if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'success');
-        actualizarInfoCliente(resultado.cliente);
+        
+        // Actualizar puntos del usuario activo
+        usuarioActivo.puntos = resultado.cliente.puntos;
+        AuthService.guardarUsuarioActivo(usuarioActivo);
+        
+        // Recargar historial desde Supabase para obtener el redemption recién creado
+        console.log('[App] Recargando historial desde Supabase...');
+        if (usuarioActivo.id) {
+          const historialActualizado = await AuthService.cargarHistorialDesdeSupabase(usuarioActivo.id);
+          usuarioActivo.historial = historialActualizado;
+          console.log('[App] Historial actualizado en memoria:', usuarioActivo.historial.length, 'canjes');
+          
+          // Guardar el usuario con el historial actualizado
+          AuthService.guardarUsuarioActivo(usuarioActivo);
+          console.log('[App] Usuario guardado con historial actualizado');
+          
+          // Pequeño delay para asegurar que los datos se guardaron
+          if (window.Utils && typeof Utils.delay === 'function') {
+            await Utils.delay(100);
+          }
+          
+          console.log('[App] Historial recargado desde Supabase:', historialActualizado.length, 'canjes');
+        } else {
+          // Fallback: si no hay ID de usuario, registrar localmente
+          if (!usuarioActivo.historial) usuarioActivo.historial = [];
+          const registroHistorial = {
+            fecha: new Date().toLocaleString(),
+            fechaHora: new Date().toISOString(),
+            tipo: 'canje',
+            producto: resultado.producto,
+            costo: puntosRequeridos,
+            puntos: puntosRequeridos,
+            tienda: resultado.tienda || 'Tienda',
+            descripcion: `Canjeaste ${resultado.producto} por ${puntosRequeridos} puntos`
+          };
+          
+          console.log('[App] Agregando al historial (fallback local):', registroHistorial);
+          usuarioActivo.historial.push(registroHistorial);
+          AuthService.guardarUsuarioActivo(usuarioActivo);
+        }
+        
+        // Actualizar UI - usa los datos del usuario actualizado
+        console.log('[App] Actualizando UI con usuario:', usuarioActivo.email, 'historial:', usuarioActivo.historial?.length);
+        
+        // Actualizar solo los puntos sin sobrescribir el historial
+        usuarioActivo.puntos = resultado.cliente.puntos;
+        AuthService.guardarUsuarioActivo(usuarioActivo);
+        
+        // Actualizar la UI mostrando puntos
+        const resultadoDiv = document.getElementById("resultado");
+        if (resultadoDiv) {
+          resultadoDiv.innerHTML = `
+            <div class="user-email">
+              <span>📧 ${usuarioActivo.email}</span>
+            </div>
+            <div class="puntos-disponibles">
+              <div class="label">Puntos Disponibles</div>
+              <div class="valor">${(usuarioActivo.puntos || 0).toLocaleString()}</div>
+            </div>
+          `;
+        }
+        
         mostrarProductosDisponibles();
+        
+        // Pasar explícitamente el usuario actualizado a mostrarHistorial
+        console.log('[App] Llamando mostrarHistorial con usuario:', usuarioActivo.email, 'historial:', usuarioActivo.historial?.length);
         mostrarHistorial();
       } else {
         if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
@@ -497,44 +529,71 @@ function configurarModal() {
   });
 }
 
+// Hacer confirmarCanjeDesdeModal disponible globalmente
+window.confirmarCanjeDesdeModal = confirmarCanjeDesdeModal;
+
 function cerrarModalProducto() {
   const modal = document.getElementById("modalProducto");
   if (modal) modal.classList.remove("active");
 }
 
-function mostrarHistorial() {
-  const usuarioActivo = AuthService.obtenerUsuarioActivo();
-  const historial = document.getElementById("historial");
-  
-  if (!historial) return;
-  
-  historial.innerHTML = "";
+// Función global para cerrar modal desde el HTML
+window.cerrarModalProducto = cerrarModalProducto;
 
-  if (!usuarioActivo.historial || usuarioActivo.historial.length === 0) {
-    historial.innerHTML = `
-      <li style="text-align: center; color: #999; padding: 30px; background: transparent; border: none;">
+function mostrarHistorial() {
+  console.log('[App] mostrarHistorial() llamado');
+  
+  // Obtener el usuario actual tanto de memoria como de storage
+  let usuarioActivo = AuthService.obtenerUsuarioActivo();
+  console.log('[App] Usuario obtenido de AuthService:', usuarioActivo?.email, 'Historial length:', usuarioActivo?.historial?.length);
+  
+  // Si no hay usuario en memoria, intentar desde StorageService directamente
+  if (!usuarioActivo) {
+    usuarioActivo = StorageService.get('usuarioActivo', null);
+    console.log('[App] Usuario obtenido de StorageService:', usuarioActivo?.email, 'Historial length:', usuarioActivo?.historial?.length);
+  }
+  
+  const historialContainer = document.getElementById("historial");
+  
+  if (!historialContainer) {
+    console.warn('[App] Elemento historial no encontrado en el DOM');
+    return;
+  }
+  
+  historialContainer.innerHTML = "";
+
+  // Verificar que el historial existe y tiene datos
+  const historialData = usuarioActivo?.historial;
+  
+  if (!historialData || historialData.length === 0) {
+    console.log('[App] No hay historial para mostrar. Usuario activo:', usuarioActivo?.email, 'Historial:', historialData?.length || 0);
+    console.log('[App] Datos completos del usuario:', usuarioActivo);
+    historialContainer.innerHTML = `
+      <div style="text-align: center; color: #999; padding: 30px; background: transparent; border: none;">
         <span style="font-size: 2em;">📋</span><br>
         Aún no has realizado canjes
-      </li>
+      </div>
     `;
     return;
   }
 
-  // Mostrar en orden inverso (más reciente primero)
-  [...usuarioActivo.historial].reverse().forEach(item => {
-    const li = document.createElement("li");
+  console.log('[App] Mostrando historial con', historialData.length, 'canjes');
+
+  // Mostrar en orden ascendente (más antiguo primero, más reciente al final)
+  historialData.forEach((item, index) => {
+    const li = document.createElement("div");
+    li.className = "historial-item";
+    
     if (typeof item === 'string') {
       li.textContent = item;
     } else {
       const display = item.fechaHora ? (isNaN(new Date(item.fechaHora)) ? (item.fecha || '') : new Date(item.fechaHora).toLocaleString()) : (item.fecha || '');
       li.innerHTML = `
         <strong>${item.producto}</strong>
-        <span>
-          ${item.costo} puntos • ${item.tienda} • ${display}
-        </span>
+        <div class="fecha">${display} - ${item.costo} pts</div>
       `;
     }
-    historial.appendChild(li);
+    historialContainer.appendChild(li);
   });
 }
 
@@ -1271,7 +1330,10 @@ function logout() {
 
   AuthService.cerrarSesion();
   window.location.href = "login.html";
-  
+}
+
+// Hacer la función logout disponible globalmente
+window.logout = logout;
 
 // ========== EVENTBUS LISTENERS (UI UPDATES & AUDIT) ==========
 if (window.EventBus) {
@@ -1334,5 +1396,4 @@ if (window.EventBus) {
       console.warn('Error registrando transaccion logout:', err);
     }
   });
-}
 }
