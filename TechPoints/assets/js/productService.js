@@ -633,6 +633,14 @@ const ProductService = {
 
       if (error) {
         console.warn('[ProductService] ⚠️ Error en RPC:', error.message);
+        
+        // Si es 404, probablemente la función no existe
+        if (error.message.includes('404')) {
+          console.error('[ProductService] ❌ La función RPC "actualizar_producto" no existe en Supabase');
+          console.error('[ProductService] ❌ Por favor, crea la función RPC en Supabase Console');
+          throw new Error('Función RPC "actualizar_producto" no existe. Configúrala en Supabase.');
+        }
+        
         throw error;
       }
 
@@ -689,8 +697,8 @@ const ProductService = {
         precioDolar: precioDolar ? parseFloat(precioDolar) : null,
         precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
         descripcion: descripcion ? descripcion.trim() : null,
-        imagen: imagen ? imagen.trim() : null,
-        imagen_url: imagen ? imagen.trim() : null,
+        imagen: imagenFileOrUrl && typeof imagenFileOrUrl === 'string' ? imagenFileOrUrl : (productos[index].imagen || null),
+        imagen_url: imagenFileOrUrl && typeof imagenFileOrUrl === 'string' ? imagenFileOrUrl : (productos[index].imagen_url || null),
         stock: stock !== null ? parseInt(stock) : (productos[index].stock || 0),
         actualizado_at: new Date().toISOString()
       };

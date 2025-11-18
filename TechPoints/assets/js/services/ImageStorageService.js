@@ -10,9 +10,15 @@ const ImageStorageService = {
 
   // Verificar si Supabase Storage está disponible
   isStorageAvailable() {
-    return typeof window.supabase !== 'undefined' && 
-           window.supabase !== null && 
-           typeof window.supabase.storage !== 'undefined';
+    try {
+      return typeof window.supabase !== 'undefined' && 
+             window.supabase !== null && 
+             typeof window.supabase.storage !== 'undefined' &&
+             window.supabase.storage !== null;
+    } catch (e) {
+      console.warn('[ImageStorageService] Error verificando disponibilidad:', e.message);
+      return false;
+    }
   },
 
   // Generar nombre único para la imagen
@@ -57,8 +63,18 @@ const ImageStorageService = {
 
   // Subir imagen a Supabase Storage
   async uploadImage(file, tiendaId, productoId) {
+    console.log('[ImageStorageService] 🔍 Verificando disponibilidad de Storage...');
+    console.log('[ImageStorageService] window.supabase:', typeof window.supabase);
+    console.log('[ImageStorageService] window.supabase.storage:', typeof window.supabase?.storage);
+    
     if (!this.isStorageAvailable()) {
-      console.warn('[ImageStorageService] Storage no disponible, retornando null');
+      console.warn('[ImageStorageService] ❌ Storage no disponible');
+      console.warn('[ImageStorageService] Debug info:', {
+        hasSupabase: typeof window.supabase !== 'undefined',
+        supabaseIsNull: window.supabase === null,
+        hasStorage: typeof window.supabase?.storage !== 'undefined',
+        storageIsNull: window.supabase?.storage === null
+      });
       return { success: false, error: 'Storage no disponible', url: null };
     }
 
@@ -92,15 +108,14 @@ const ImageStorageService = {
         .from(this.BUCKET_NAME)
         .upload(storagePath, blob, {
           contentType: file.type,
-          upsert: false // No sobrescribir
+          upsert: false
         });
 
       if (error) {
         console.error('[ImageStorageService] Error en upload:', error.message);
         
-        // Si el bucket no existe, intentar crear uno
         if (error.message.includes('404') || error.message.includes('not found')) {
-          console.warn('[ImageStorageService] Bucket no existe. Por favor, crea un bucket llamado "product-images" en Supabase Storage');
+          console.warn('[ImageStorageService] ❌ Bucket no existe. Por favor, crea un bucket llamado "product-images" en Supabase Storage');
           return { 
             success: false, 
             error: 'Bucket no configurado. Por favor, configura Supabase Storage.',
@@ -112,7 +127,7 @@ const ImageStorageService = {
         return { success: false, error: error.message, url: null };
       }
 
-      console.log('[ImageStorageService] Archivo subido:', data);
+      console.log('[ImageStorageService] ✅ Archivo subido:', data);
 
       // Obtener URL pública
       const { data: publicUrlData } = window.supabase.storage
