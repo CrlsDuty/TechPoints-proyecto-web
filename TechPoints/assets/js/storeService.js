@@ -12,6 +12,8 @@ const StoreService = {
   async agregarPuntosCliente(clienteEmail, puntos) {
     if (this.isSupabaseEnabled()) {
       try {
+        console.log('[StoreService] Intentando agregar puntos a Supabase...');
+        
         // Obtener perfil del cliente
         const { data: perfil, error: perfilError } = await window.supabase
           .from('profiles')
@@ -23,48 +25,66 @@ const StoreService = {
           return { success: false, message: 'Cliente no encontrado' };
         }
 
-        // Llamar función RPC agregar_puntos_cliente
-        const { data, error } = await window.supabase.rpc('agregar_puntos_cliente', {
-          p_perfil_id: perfil.id,
-          p_puntos: parseInt(puntos),
-          p_source: 'compra_tienda'
+        // Actualizar puntos directamente en profiles con fetch POST
+        const puntosInt = parseInt(puntos);
+        const nuevosPuntos = (perfil.puntos || 0) + puntosInt;
+        
+        const url = `${window.supabase.url}/rest/v1/profiles?id=eq.${perfil.id}`;
+        const headers = {
+          'Content-Type': 'application/json',
+          'apikey': window.supabase._anonKey,
+          'Prefer': 'return=representation'
+        };
+
+        const updateData = {
+          puntos: nuevosPuntos,
+          actualizado_at: new Date().toISOString()
+        };
+
+        console.log('[StoreService] Actualizando puntos en Supabase:', { clienteEmail, puntosAgregados: puntosInt, nuevosPuntos });
+        
+        const response = await fetch(url, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(updateData)
         });
 
-        if (error) {
-          return { success: false, message: error.message };
-        }
-
-        if (!data[0].success) {
-          return { success: false, message: data[0].message };
-        }
-
-        // Registrar transacción localmente
-        if (window.EventBus && typeof EventBus.emit === 'function') {
-          try {
-            EventBus.emit('puntos-agregados', perfil);
-          } catch (e) {
-            console.warn('EventBus emit failed (puntos-agregados)', e);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[StoreService] ✅ Puntos agregados a Supabase:', data);
+          
+          // Registrar transacción localmente
+          if (window.EventBus && typeof EventBus.emit === 'function') {
+            try {
+              EventBus.emit('puntos-agregados', perfil);
+            } catch (e) {
+              console.warn('EventBus emit failed (puntos-agregados)', e);
+            }
           }
-        }
 
-        if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
-          try {
-            const tienda = AuthService.obtenerUsuarioActivo()?.email || 'desconocida';
-            TransactionService.registrarTransaccion('compra-puntos', {
-              cliente: clienteEmail,
-              puntos: parseInt(puntos),
-              tienda
-            });
-          } catch (e) {
-            console.warn('Failed to register transaction (compra-puntos)', e);
+          if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
+            try {
+              const tienda = AuthService.obtenerUsuarioActivo()?.email || 'desconocida';
+              TransactionService.registrarTransaccion('compra-puntos', {
+                cliente: clienteEmail,
+                puntos: puntosInt,
+                tienda
+              });
+            } catch (e) {
+              console.warn('Failed to register transaction (compra-puntos)', e);
+            }
           }
-        }
 
-        return {
-          success: true,
-          message: `Se agregaron ${puntos} puntos a ${clienteEmail}`,
-          puntosNuevos: data[0].puntos_nuevos
-        };
+          return {
+            success: true,
+            message: `Se agregaron ${puntosInt} puntos a ${clienteEmail}`,
+            puntosNuevos: nuevosPuntos
+          };
+        } else {
+          const errorText = await response.text();
+          console.warn('[StoreService] ⚠️ Error HTTP ' + response.status + ':', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
       } catch (e) {
         console.error('[StoreService] Error agregando puntos:', e);
         return { success: false, message: e.message };
