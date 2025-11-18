@@ -12,12 +12,22 @@ const ProductService = {
   async obtenerProductos() {
     if (this.isSupabaseEnabled()) {
       try {
-        // Seleccionar productos con info de la tienda (JOIN)
+        console.log('[ProductService] Obteniendo productos de Supabase...');
         const { data, error } = await window.supabase
           .from('products')
           .select('*, stores(nombre)')
           .order('creado_at', { ascending: false });
-        if (error) throw error;
+        
+        if (error) {
+          console.error('[ProductService] Error de Supabase:', error.message);
+          // Mostrar toast al usuario
+          if (window.Utils && typeof Utils.mostrarToast === 'function') {
+            Utils.mostrarToast('⚠️ Usando datos locales (Supabase no disponible)', 'warning');
+          }
+          throw error;
+        }
+        
+        console.log('[ProductService] Productos obtenidos de Supabase:', data?.length || 0);
         
         // Mapear datos para que tengan estructura esperada por app.js
         return (data || []).map(p => ({
@@ -25,10 +35,14 @@ const ProductService = {
           tienda_nombre: p.stores?.nombre || 'Tienda desconocida'
         }));
       } catch (e) {
-        console.error('[ProductService] Error obteniendo productos de Supabase:', e);
-        return StorageService.get('productos', []) || [];
+        console.error('[ProductService] Error obteniendo productos de Supabase:', e.message);
+        console.log('[ProductService] Revirtiendo a localStorage');
+        const fallback = StorageService.get('productos', []) || [];
+        console.log('[ProductService] Productos en fallback (localStorage):', fallback.length);
+        return fallback;
       }
     }
+    console.log('[ProductService] Supabase no disponible, usando localStorage');
     return StorageService.get('productos', []) || [];
   },
 
@@ -41,15 +55,26 @@ const ProductService = {
   async agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = 0) {
     if (this.isSupabaseEnabled()) {
       try {
+        // Obtener usuario actual
+        const usuario = (await window.supabase.auth.getUser()).data?.user;
+        
+        // Si es usuario local (fallback), usar localStorage
+        if (!usuario || usuario.id?.startsWith('local-')) {
+          console.log('[ProductService] Usuario local detected, usando fallback localStorage');
+          // Delegar a fallback
+          throw new Error('Usuario local - usar fallback');
+        }
+
         // Obtener tienda del propietario autenticado
         const { data: stores, error: storeError } = await window.supabase
           .from('stores')
           .select('id')
-          .eq('owner_id', (await window.supabase.auth.getUser()).data.user?.id)
+          .eq('owner_id', usuario.id)
           .single();
 
         if (storeError || !stores) {
-          return { success: false, message: 'No tienes una tienda registrada' };
+          console.warn('[ProductService] Store not found for user, using fallback');
+          throw new Error('No tienda registrada - usar fallback');
         }
 
         const nuevoProducto = {
@@ -68,7 +93,8 @@ const ProductService = {
         return { success: true, producto: data[0] };
       } catch (e) {
         console.error('[ProductService] Error agregando producto a Supabase:', e);
-        return { success: false, message: e.message };
+        console.log('[ProductService] Cayendo a fallback localStorage');
+        // Caer a fallback si hay error
       }
     }
 
@@ -84,7 +110,7 @@ const ProductService = {
         return resolve({ success: false, message: 'El costo debe ser mayor a 0' });
       }
 
-      const productos = this.obtenerProductos();
+      const productos = await this.obtenerProductos();
       const nuevoProducto = {
         id: Date.now(),
         tienda: tiendaEmail,
@@ -326,6 +352,12 @@ const ProductService = {
   async actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = null) {
     if (this.isSupabaseEnabled()) {
       try {
+        // Si usuario es local, usar fallback
+        const usuario = (await window.supabase.auth.getUser()).data?.user;
+        if (!usuario || usuario.id?.startsWith('local-')) {
+          throw new Error('Usuario local - usar fallback');
+        }
+
         const actualizacion = {
           nombre: nombre.trim(),
           costo_puntos: parseInt(costo),
@@ -350,7 +382,8 @@ const ProductService = {
         return { success: true, producto: data[0], message: 'Producto actualizado correctamente' };
       } catch (e) {
         console.error('[ProductService] Error actualizando producto:', e);
-        return { success: false, message: e.message };
+        console.log('[ProductService] Cayendo a fallback localStorage');
+        // Caer a fallback si hay error
       }
     }
 

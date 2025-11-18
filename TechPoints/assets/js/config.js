@@ -179,6 +179,9 @@ const Config = {
         categoria: 'accesorios',
         tienda: 'tienda@mail.com',
         costo: 500,
+        costo_puntos: 500,
+        precio_dolar: 25.00,
+        precioDolar: 25.00,
         descripcion: 'Mouse gaming de alta precisión con iluminación RGB',
         stock: 10
       },
@@ -188,6 +191,9 @@ const Config = {
         categoria: 'accesorios',
         tienda: 'tienda@mail.com',
         costo: 800,
+        costo_puntos: 800,
+        precio_dolar: 40.00,
+        precioDolar: 40.00,
         descripcion: 'Teclado mecánico con switches Cherry MX',
         stock: 5
       },
@@ -197,6 +203,9 @@ const Config = {
         categoria: 'audio',
         tienda: 'tienda@mail.com',
         costo: 600,
+        costo_puntos: 600,
+        precio_dolar: 30.00,
+        precioDolar: 30.00,
         descripcion: 'Auriculares con sonido envolvente 7.1',
         stock: 8
       }
