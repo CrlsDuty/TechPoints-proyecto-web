@@ -1236,7 +1236,7 @@ function configurarModalProductoTienda() {
       
       try {
         const usuarioActivo = AuthService.obtenerUsuarioActivo();
-        const resultado = ProductService.eliminarProducto(productoTiendaActual.id, usuarioActivo.email);
+        const resultado = await ProductService.eliminarProducto(productoTiendaActual.id, usuarioActivo.email);
         
         if (resultado.success) {
           if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Producto eliminado correctamente', 'success');

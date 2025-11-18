@@ -13,9 +13,10 @@ const ProductService = {
     if (this.isSupabaseEnabled()) {
       try {
         console.log('[ProductService] Obteniendo productos de Supabase...');
+        // Simplificar query: sin joins que causen HTTP 400
         const { data, error } = await window.supabase
           .from('products')
-          .select('*, stores(nombre, owner_id)')
+          .select('*')
           .order('creado_at', { ascending: false });
         
         if (error) {
@@ -29,18 +30,12 @@ const ProductService = {
         
         console.log('[ProductService] Productos obtenidos de Supabase:', data?.length || 0);
         
-        // Mapear datos para agregar campo 'tienda' (email del propietario)
-        // Por ahora, usar el nombre de la tienda como identificador
+        // Mapear datos - ya no necesitamos joins
         return (data || []).map(p => {
-          // El email se obtendría de otra query, por ahora usar nombre
-          // En fallback se buscará por p.id y p.tienda (que será nombre de tienda)
-          const tiendaNombre = p.stores?.nombre || 'desconocida';
-          
           return {
             ...p,
-            tienda: tiendaNombre,  // Usar nombre de tienda para fallback
-            tienda_nombre: tiendaNombre,
-            owner_id: p.stores?.owner_id
+            tienda: 'Supabase',  // Marca que viene de Supabase
+            tienda_id: p.tienda_id
           };
         });
       } catch (e) {
@@ -64,6 +59,8 @@ const ProductService = {
   async agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = 0) {
     if (this.isSupabaseEnabled()) {
       try {
+        console.log('[ProductService] Intentando agregar producto a Supabase...');
+        
         // Obtener usuario actual
         const usuario = (await window.supabase.auth.getUser()).data?.user;
         
@@ -96,10 +93,31 @@ const ProductService = {
           stock: parseInt(stock) || 0
         };
 
-        const { data, error } = await window.supabase.from('products').insert([nuevoProducto]).select();
-        if (error) throw error;
+        // Usar fetch directo a PostgREST REST API para INSERT
+        const url = `${window.supabase.url}/rest/v1/products`;
+        const headers = {
+          'Content-Type': 'application/json',
+          'apikey': window.supabase._anonKey,
+          'Prefer': 'return=representation'
+        };
 
-        return { success: true, producto: data[0] };
+        console.log('[ProductService] Fetch directo INSERT a:', url);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(nuevoProducto)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[ProductService] ✅ Producto agregado a Supabase:', data);
+          return { success: true, producto: Array.isArray(data) ? data[0] : data };
+        } else {
+          const errorText = await response.text();
+          console.warn('[ProductService] ⚠️ Error HTTP ' + response.status + ':', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
       } catch (e) {
         console.error('[ProductService] Error agregando producto a Supabase:', e);
         console.log('[ProductService] Cayendo a fallback localStorage');
@@ -139,25 +157,27 @@ const ProductService = {
 
   // Obtener productos de una tienda específica
   async obtenerProductosPorTienda(tiendaEmail) {
-    // Primero intentar localStorage (que tiene actualizaciones recientes)
-    const productosLocal = StorageService.get('productos', []);
-    if (productosLocal && productosLocal.length > 0) {
-      const filtrados = productosLocal.filter(p => p.tienda === tiendaEmail || p.tienda_nombre || true);
-      console.log('[ProductService] Retornando productos de localStorage:', filtrados.length);
-      return filtrados;
-    }
-
-    // Si no hay en localStorage, traer de Supabase
+    // Siempre traer de Supabase para mantener sincronización (la fuente de verdad)
     if (this.isSupabaseEnabled()) {
       try {
-        // En Supabase buscamos por tienda_id
+        console.log('[ProductService] Obteniendo productos de tienda desde Supabase...');
+        
+        // Obtener tienda del usuario autenticado
+        const usuario = (await window.supabase.auth.getUser()).data?.user;
+        
+        if (!usuario) {
+          console.warn('[ProductService] No usuario autenticado, usando localStorage');
+          return StorageService.get('productos', []).filter(p => p.tienda === tiendaEmail);
+        }
+
+        // En Supabase buscamos por owner_id
         const { data: stores, error: storesError } = await window.supabase
           .from('stores')
           .select('id')
-          .limit(1);
+          .eq('owner_id', usuario.id);
         
         if (storesError || !stores || stores.length === 0) {
-          console.warn('[ProductService] No stores found or error:', storesError);
+          console.warn('[ProductService] No stores found for user:', storesError);
           // Fallback to localStorage
           return StorageService.get('productos', []).filter(p => p.tienda === tiendaEmail);
         }
@@ -167,7 +187,8 @@ const ProductService = {
         const { data: productos, error } = await window.supabase
           .from('products')
           .select('*')
-          .eq('tienda_id', tiendaId);
+          .eq('tienda_id', tiendaId)
+          .order('creado_at', { ascending: false });
         
         if (error) {
           console.warn('[ProductService] Error fetching products by tienda:', error);
@@ -175,7 +196,13 @@ const ProductService = {
           return StorageService.get('productos', []).filter(p => p.tienda === tiendaEmail);
         }
         
-        return productos || [];
+        console.log('[ProductService] Productos de Supabase para tienda:', productos?.length || 0);
+        
+        // Mapear datos de Supabase
+        return (productos || []).map(p => ({
+          ...p,
+          tienda: 'Supabase'
+        }));
       } catch (e) {
         console.warn('[ProductService] Error filtrando por tienda:', e);
         // Fallback to localStorage
@@ -352,8 +379,42 @@ const ProductService = {
   },
 
   // Eliminar producto (opcional para futuras mejoras)
-  eliminarProducto(productoId, tiendaEmail) {
-    let productos = this.obtenerProductos();
+  async eliminarProducto(productoId, tiendaEmail) {
+    if (this.isSupabaseEnabled()) {
+      try {
+        console.log('[ProductService] Intentando eliminar producto de Supabase...');
+        
+        // Usar fetch directo a PostgREST REST API para DELETE
+        const url = `${window.supabase.url}/rest/v1/products?id=eq.${productoId}`;
+        const headers = {
+          'apikey': window.supabase._anonKey,
+          'Prefer': 'return=representation'
+        };
+
+        console.log('[ProductService] Fetch directo DELETE a:', url);
+        
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers
+        });
+
+        if (response.ok) {
+          console.log('[ProductService] ✅ Producto eliminado de Supabase');
+          return { success: true, message: 'Producto eliminado correctamente' };
+        } else {
+          const errorText = await response.text();
+          console.warn('[ProductService] ⚠️ Error HTTP ' + response.status + ':', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+      } catch (e) {
+        console.error('[ProductService] Error eliminando producto de Supabase:', e);
+        console.log('[ProductService] Cayendo a fallback localStorage');
+        // Caer a fallback si hay error
+      }
+    }
+
+    // Fallback: localStorage
+    const productos = await this.obtenerProductos();
     const index = productos.findIndex(p => p.id === productoId && p.tienda === tiendaEmail);
     
     if (index === -1) {
@@ -368,32 +429,78 @@ const ProductService = {
 
   // Actualizar producto (editar detalles incluyendo stock)
   async actualizarProducto(productoId, tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagen = null, stock = null) {
-    // Por ahora, debido a limitaciones de RLS con database-direct login,
-    // usar fallback directo a localStorage para actualizaciones
-    console.log('[ProductService] Actualizando producto (fallback a localStorage)');
+    // Intentar actualizar en Supabase usando UPDATE con filtro en URL
+    console.log('[ProductService] Actualizando producto en Supabase...');
     
-    // Saltamos la tentativa de Supabase y vamos directo al fallback
-    if (false) { // Deshabilitar Supabase update por ahora
-      try {
-        // Código de Supabase deshabilitado temporalmente
-      } catch (e) {
-        // Error
+    let supabaseSuccess = false;
+    try {
+      if (!window.supabase) {
+        throw new Error('Supabase no está disponible');
       }
+
+      // Construir URL con filtro manualmente para evitar problemas con PostgREST
+      const updateData = {
+        nombre: nombre.trim(),
+        costo_puntos: parseInt(costo),
+        precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
+        descripcion: descripcion ? descripcion.trim() : null,
+        imagen_url: imagen ? imagen.trim() : null,
+        stock: stock !== null ? parseInt(stock) : null,
+        actualizado_at: new Date().toISOString()
+      };
+
+      // Eliminar campos null
+      Object.keys(updateData).forEach(key => 
+        updateData[key] === null && delete updateData[key]
+      );
+
+      // Usar fetch directo a PostgREST REST API (más confiable que el cliente)
+      const url = `${window.supabase.url}/rest/v1/products?id=eq.${productoId}`;
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': window.supabase._anonKey,
+        'Prefer': 'return=representation'
+      };
+
+      console.log('[ProductService] Fetch directo a:', url);
+      
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(updateData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[ProductService] ✅ Producto actualizado en Supabase:', data);
+        supabaseSuccess = true;
+      } else {
+        const errorText = await response.text();
+        console.warn('[ProductService] ⚠️ Error HTTP ' + response.status + ':', errorText);
+      }
+    } catch (e) {
+      console.warn('[ProductService] ⚠️ Supabase update falló:', e.message);
     }
 
-    // Fallback: localStorage
+    // Fallback: localStorage (para respaldo si Supabase falla)
     return new Promise(async (resolve) => {
       if (window.Utils && typeof Utils.delay === 'function') await Utils.delay(200);
 
       let productos = await this.obtenerProductos();
       
       // Buscar por ID del producto
-      // Si p.tienda es nombre de tienda (de Supabase), ignorar la comparación de tienda
-      // Si p.tienda es email (de localStorage), comparar ambos
+      // Cuando viene de Supabase: tienda === 'Supabase', buscar solo por ID
+      // Cuando viene de localStorage: tienda === email, validar también tienda
       const index = productos.findIndex(p => {
         const idMatch = p.id === productoId;
-        // Compatibilidad: p.tienda puede ser email (localStorage) o nombre (Supabase)
-        const tiendaMatch = !p.tienda || p.tienda === tiendaEmail || p.owner_id; // Si hay owner_id, es de Supabase
+        
+        // Si es de Supabase (tienda === 'Supabase'), buscar solo por ID
+        if (p.tienda === 'Supabase') {
+          return idMatch;
+        }
+        
+        // Si es de localStorage, validar también tienda
+        const tiendaMatch = p.tienda === tiendaEmail || p.owner_id;
         return idMatch && tiendaMatch;
       });
 
@@ -414,24 +521,31 @@ const ProductService = {
         return resolve({ success: false, message: 'El stock no puede ser negativo' });
       }
 
-      productos[index] = {
+      // Actualizar en localStorage como fallback/caché local
+      const productoActualizado = {
         ...productos[index],
         nombre: nombre.trim(),
         costo: parseInt(costo),
-        costo_puntos: parseInt(costo),  // También actualizar costo_puntos para Supabase
+        costo_puntos: parseInt(costo),
         precioDolar: precioDolar ? parseFloat(precioDolar) : null,
-        precio_dolar: precioDolar ? parseFloat(precioDolar) : null,  // También para Supabase
+        precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
         descripcion: descripcion ? descripcion.trim() : null,
         imagen: imagen ? imagen.trim() : null,
-        imagen_url: imagen ? imagen.trim() : null,  // También para Supabase
+        imagen_url: imagen ? imagen.trim() : null,
         stock: stock !== null ? parseInt(stock) : (productos[index].stock || 0),
         actualizado_at: new Date().toISOString()
       };
 
+      productos[index] = productoActualizado;
       this.guardarProductos(productos);
-      console.log('[ProductService] ✅ Producto guardado en localStorage:', productos[index].nombre);
+      console.log('[ProductService] ✅ Producto guardado en localStorage:', productoActualizado.nombre);
 
-      return resolve({ success: true, producto: productos[index], message: 'Producto actualizado correctamente' });
+      // Retornar éxito (ya actualizado en Supabase en el bloque anterior)
+      const mensaje = supabaseSuccess 
+        ? 'Producto actualizado en Supabase y localStorage' 
+        : 'Producto actualizado en localStorage (Supabase offline/error)';
+      
+      return resolve({ success: true, producto: productoActualizado, message: mensaje });
     });
   }
 };
