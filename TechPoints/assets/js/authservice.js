@@ -32,9 +32,14 @@ const AuthService = {
 
   // Iniciar sesión usando Supabase cuando esté disponible; si no, fallback local
   async signIn(email, password) {
+    // IMPORTANTE: signIn DEBE usar Supabase siempre para login
+    // Solo si Supabase está completamente indisponible, usar fallback
     if (!this.isSupabaseEnabled()) {
-      console.log('[AuthService] ⚠️ Supabase NO HABILITADO, usando fallback local');
-      return this.validarLogin(email, password);
+      console.error('[AuthService] ❌ CRÍTICO: Supabase no está disponible. No se puede iniciar sesión.');
+      return { 
+        success: false, 
+        message: 'No hay conexión a Supabase. Por favor, verifica tu conexión a internet y recarga la página.' 
+      };
     }
 
     try {
@@ -55,26 +60,23 @@ const AuthService = {
       
       if (queryErr) {
         console.error('[AuthService] ❌ Error en query:', queryErr.message);
-        console.warn('[AuthService] 🔄 Intentando fallback local...');
-        return this.validarLogin(email, password);
+        return { success: false, message: 'Error consultando credenciales: ' + queryErr.message };
       }
 
       if (!profiles || profiles.length === 0) {
-        console.error('[AuthService] ❌ Perfil no encontrado para:', email);
-        console.warn('[AuthService] 🔄 Intentando fallback local...');
-        return this.validarLogin(email, password);
+        console.error('[AuthService] ❌ Usuario no encontrado en Supabase:', email);
+        return { success: false, message: 'Usuario o contraseña incorrectos' };
       }
 
       const profileData = profiles[0];
       
-      // Validar contraseña localmente
+      // Validar contraseña localmente (desde localStorage de registro)
       const localUsers = this.obtenerUsuarios();
       const localUser = localUsers.find(u => u.email === email && u.password === password);
 
       if (!localUser) {
         console.error('[AuthService] ❌ Credenciales incorrectas');
-        console.warn('[AuthService] 🔄 Intentando fallback local...');
-        return this.validarLogin(email, password);
+        return { success: false, message: 'Usuario o contraseña incorrectos' };
       }
 
       // Si llegamos aquí: perfil en Supabase + credenciales válidas
@@ -129,20 +131,27 @@ const AuthService = {
         name: e.name,
         message: e.message
       });
-      console.warn('[AuthService] 🔄 Intentando fallback local...');
-      return this.validarLogin(email, password);
+      return { success: false, message: 'Error en la autenticación: ' + e.message };
     }
   },
 
   // Registrar usando Supabase cuando esté disponible; si no, fallback local
   async signUp(email, password, role, tiendaInfo = null) {
+    // IMPORTANTE: signUp DEBE usar Supabase siempre
+    // No hay fallback local para registro
     if (!this.isSupabaseEnabled()) {
-      return this.registrarUsuario(email, password, role, tiendaInfo);
+      console.error('[AuthService] ❌ CRÍTICO: Supabase no está disponible. No se puede registrar.');
+      return { 
+        success: false, 
+        message: 'No hay conexión a Supabase. Por favor, verifica tu conexión a internet y recarga la página.' 
+      };
     }
 
     try {
-      console.log('[AuthService] Registrando usuario en Supabase:', email);
+      console.log('[AuthService] 🔄 Registrando usuario en Supabase:', email);
+      console.log('[AuthService] Datos de tienda:', tiendaInfo);
       
+      // Paso 1: Crear usuario en auth
       const { data, error } = await window.supabase.auth.signUp({ 
         email, 
         password,
@@ -155,17 +164,19 @@ const AuthService = {
       });
       
       if (error) {
-        console.error('[AuthService] Error en signUp:', error.message);
+        console.error('[AuthService] ❌ Error en signUp:', error.message);
         return { success: false, message: error.message };
       }
 
       const userId = data?.user?.id;
       if (!userId) {
-        console.error('[AuthService] No se obtuvo userId');
+        console.error('[AuthService] ❌ No se obtuvo userId');
         return { success: false, message: 'No se obtuvo id de usuario' };
       }
 
-      // Insertar perfil
+      console.log('[AuthService] ✅ Usuario creado en auth:', userId);
+
+      // Paso 2: Insertar perfil en table profiles
       const profile = {
         id: userId,
         email,
@@ -175,33 +186,54 @@ const AuthService = {
         metadata: tiendaInfo || {}
       };
 
+      console.log('[AuthService] 📝 Insertando perfil:', profile);
+
       const { error: pErr } = await window.supabase.from('profiles').insert([profile]);
       if (pErr) {
-        console.error('[AuthService] Error insertando perfil:', pErr.message);
+        console.error('[AuthService] ❌ Error insertando perfil:', pErr.message);
+        console.error('[AuthService] Detalles del error:', pErr);
         return { success: false, message: 'Error creando perfil: ' + pErr.message };
       }
 
-      // Si es tienda, crear store
+      console.log('[AuthService] ✅ Perfil creado');
+
+      // Paso 3: Si es tienda, crear store
       if (role === 'tienda' && tiendaInfo) {
-        const { error: sErr } = await window.supabase.from('stores').insert([{
+        const storeData = {
           owner_id: userId,
-          nombre: tiendaInfo.nombre,
+          nombre: tiendaInfo.nombre || 'Tienda sin nombre',
           descripcion: tiendaInfo.descripcion || 'Tienda de ' + tiendaInfo.nombre,
           contacto: {
-            telefono: tiendaInfo.telefono,
-            direccion: tiendaInfo.direccion,
-            horario: tiendaInfo.horario,
-            responsable: tiendaInfo.responsable
+            telefono: tiendaInfo.telefono || '',
+            direccion: tiendaInfo.direccion || '',
+            horario: tiendaInfo.horario || '',
+            responsable: tiendaInfo.responsable || ''
           }
-        }]);
-        if (sErr) console.warn('[AuthService] Error creando store:', sErr.message);
+        };
+
+        console.log('[AuthService] 📝 Insertando store:', storeData);
+
+        const { error: sErr, data: storeResult } = await window.supabase
+          .from('stores')
+          .insert([storeData])
+          .select();
+
+        if (sErr) {
+          console.error('[AuthService] ❌ Error creando store:', sErr.message);
+          console.error('[AuthService] Detalles del error:', sErr);
+          // No retornar error aquí - el perfil ya fue creado
+          console.warn('[AuthService] ⚠️ Perfil creado pero store falló. Usuario registrado parcialmente.');
+        } else {
+          console.log('[AuthService] ✅ Store creada:', storeResult);
+        }
       }
 
-      console.log('[AuthService] Usuario registrado exitosamente:', userId);
+      console.log('[AuthService] ✅ Usuario registrado exitosamente:', userId);
       StorageService.set('usuarioActivo', profile, 24 * 60 * 60 * 1000);
       return { success: true, message: 'Usuario registrado', usuario: profile };
     } catch (e) {
-      console.error('[AuthService] Error en signUp:', e);
+      console.error('[AuthService] ❌ Exception en signUp:', e);
+      console.error('[AuthService] Stack:', e.stack);
       return { success: false, message: e.message || 'Error en signUp' };
     }
   },

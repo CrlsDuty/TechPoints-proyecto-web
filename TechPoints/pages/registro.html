@@ -236,7 +236,11 @@
         }
 
         // Call AuthService.signUp
-        console.log('[Registro] 🚀 Llamando AuthService.signUp con:', { email: data.email, role: data.role });
+        console.log('[Registro] 🚀 Llamando AuthService.signUp con:', { 
+          email: data.email, 
+          role: data.role,
+          tiendaInfo: tiendaInfo
+        });
         const resultado = await AuthService.signUp(data.email, data.password, data.role, tiendaInfo);
         
         console.log('[Registro] 📊 Resultado de signUp:', resultado);
@@ -248,7 +252,7 @@
             tipo: 'registro',
             usuario: data.email,
             rol: data.role,
-            descripcion: 'Nuevo usuario registrado',
+            descripcion: 'Nuevo usuario registrado' + (tiendaInfo ? ' (Tienda: ' + tiendaInfo.nombre + ')' : ''),
             estado: 'exitoso'
           });
 
