@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Supabase Insert</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-left: 4px solid #2196F3;
+    }
+    .log {
+      background: #222;
+      color: #0f0;
+      padding: 10px;
+      border-radius: 4px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 11px;
+      margin: 10px 0;
+      line-height: 1.4;
+    }
+    .success {
+      color: #4caf50;
+    }
+    .error {
+      color: #f44336;
+    }
+    .warning {
+      color: #ff9800;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #1976D2;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Test Supabase Insert - Debug Registration</h1>
+    
+    <div class="test-section">
+      <h2>1️⃣ Test Básico de Supabase</h2>
+      <button onclick="testSupabaseConnection()">Test Connection</button>
+      <div id="log1" class="log"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>2️⃣ Test INSERT en profiles</h2>
+      <button onclick="testInsertProfile()">Test INSERT Profile</button>
+      <div id="log2" class="log"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>3️⃣ Test Lectura de profiles</h2>
+      <button onclick="testQueryProfiles()">Test QUERY Profiles</button>
+      <div id="log3" class="log"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>4️⃣ Full Registration Flow</h2>
+      <input type="email" id="testEmail" placeholder="Email para test" value="test-debug@gmail.com">
+      <button onclick="testFullFlow()">Test Full Registration</button>
+      <div id="log4" class="log"></div>
+    </div>
+  </div>
+
+  <script src="./assets/vendor/supabase.min.js"></script>
+  <script src="./assets/js/supabaseClient.js"></script>
+  <script src="./assets/js/services/StorageService.js"></script>
+
+  <script>
+    // Función para generar UUID v4 válido
+    function generateValidUUID() {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const buf = new Uint8Array(16);
+        crypto.getRandomValues(buf);
+        buf[6] = (buf[6] & 0x0f) | 0x40; // version 4
+        buf[8] = (buf[8] & 0x3f) | 0x80; // variant 1
+        
+        const bytes = Array.from(buf);
+        return [
+          bytes.slice(0, 4).map(b => ('0' + b.toString(16)).slice(-2)).join(''),
+          bytes.slice(4, 6).map(b => ('0' + b.toString(16)).slice(-2)).join(''),
+          bytes.slice(6, 8).map(b => ('0' + b.toString(16)).slice(-2)).join(''),
+          bytes.slice(8, 10).map(b => ('0' + b.toString(16)).slice(-2)).join(''),
+          bytes.slice(10, 16).map(b => ('0' + b.toString(16)).slice(-2)).join('')
+        ].join('-');
+      }
+      
+      // Fallback: generar UUID v4 usando Math.random()
+      const chars = '0123456789abcdef'.split('');
+      const uuid = [];
+      for (let i = 0; i < 36; i++) {
+        if (i === 8 || i === 13 || i === 18 || i === 23) {
+          uuid[i] = '-';
+        } else if (i === 14) {
+          uuid[i] = '4'; // version 4
+        } else if (i === 19) {
+          uuid[i] = chars[(Math.random() * 4 | 8)]; // variant 1
+        } else {
+          uuid[i] = chars[Math.random() * 16 | 0];
+        }
+      }
+      return uuid.join('');
+    }
+
+    function log(element, msg, type = 'normal') {
+      const logDiv = document.getElementById(element);
+      const timestamp = new Date().toLocaleTimeString();
+      const line = `[${timestamp}] ${msg}`;
+      logDiv.innerHTML += `<div class="${type}">${line}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(line);
+    }
+
+    async function testSupabaseConnection() {
+      const logId = 'log1';
+      document.getElementById(logId).innerHTML = '';
+      
+      try {
+        log(logId, '🔍 Verificando window.supabase...', 'warning');
+        
+        if (!window.supabase) {
+          log(logId, '❌ window.supabase no existe', 'error');
+          return;
+        }
+        
+        log(logId, '✅ window.supabase existe', 'success');
+        
+        // Verificar config
+        if (!window._SUPABASE_CONFIG) {
+          log(logId, '❌ window._SUPABASE_CONFIG no existe', 'error');
+          return;
+        }
+        
+        log(logId, '✅ window._SUPABASE_CONFIG existe', 'success');
+        
+        // Intentar query simple con FETCH
+        log(logId, '📡 Haciendo query simple a profiles con FETCH...', 'warning');
+        
+        const config = window._SUPABASE_CONFIG;
+        const url = new URL(`${config.url}/rest/v1/profiles`);
+        url.searchParams.append('select', 'count');
+        
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey,
+            'Authorization': `Bearer ${config.anonKey}`
+          }
+        });
+        
+        log(logId, '📦 Response status: ' + response.status, 'warning');
+        
+        if (!response.ok) {
+          log(logId, '❌ Error: ' + response.statusText, 'error');
+          return;
+        }
+        
+        const data = await response.json();
+        log(logId, '✅ Query exitosa, profiles en DB: ' + data.length, 'success');
+        
+      } catch (e) {
+        log(logId, '💥 Exception: ' + e.message, 'error');
+        log(logId, 'Stack: ' + e.stack, 'error');
+      }
+    }
+
+    async function testInsertProfile() {
+      const logId = 'log2';
+      document.getElementById(logId).innerHTML = '';
+      
+      try {
+        const testId = 'test-' + Date.now();
+        const testEmail = 'test-' + Date.now() + '@debug.local';
+        
+        log(logId, '📝 Preparando INSERT...', 'warning');
+        log(logId, 'ID: ' + testId, 'warning');
+        log(logId, 'Email: ' + testEmail, 'warning');
+        
+        const profile = {
+          id: testId,
+          email: testEmail,
+          role: 'cliente',
+          nombre: 'Test User',
+          puntos: 100,
+          metadata: {
+            test: true,
+            timestamp: new Date().toISOString()
+          }
+        };
+        
+        log(logId, '🚀 Ejecutando INSERT con FETCH...', 'warning');
+        
+        const config = window._SUPABASE_CONFIG;
+        if (!config) {
+          log(logId, '❌ Config no disponible', 'error');
+          return;
+        }
+        
+        const response = await fetch(
+          `${config.url}/rest/v1/profiles`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': config.anonKey,
+              'Authorization': `Bearer ${config.anonKey}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(profile)
+          }
+        );
+        
+        log(logId, '📦 Response status: ' + response.status, 'warning');
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          log(logId, '❌ Error en INSERT: ' + response.statusText, 'error');
+          log(logId, 'Details: ' + JSON.stringify(errorData), 'error');
+          return;
+        }
+        
+        const data = await response.json();
+        log(logId, '✅ INSERT exitoso', 'success');
+        log(logId, 'Datos: ' + JSON.stringify(data[0] || data), 'success');
+        log(logId, '💾 Guardando email para verificar...', 'warning');
+        localStorage.setItem('lastTestEmail', testEmail);
+        
+      } catch (e) {
+        log(logId, '💥 Exception: ' + e.message, 'error');
+        log(logId, 'Stack: ' + e.stack, 'error');
+      }
+    }
+
+    async function testQueryProfiles() {
+      const logId = 'log3';
+      document.getElementById(logId).innerHTML = '';
+      
+      try {
+        const lastEmail = localStorage.getItem('lastTestEmail');
+        
+        if (!lastEmail) {
+          log(logId, '⚠️ No hay email de test anterior. Haz primero Test INSERT Profile', 'warning');
+          return;
+        }
+        
+        log(logId, '🔍 Buscando email: ' + lastEmail, 'warning');
+        
+        const config = window._SUPABASE_CONFIG;
+        if (!config) {
+          log(logId, '❌ Config no disponible', 'error');
+          return;
+        }
+        
+        const url = new URL(`${config.url}/rest/v1/profiles`);
+        url.searchParams.append('email', `eq.${lastEmail}`);
+        url.searchParams.append('select', '*');
+        
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey,
+            'Authorization': `Bearer ${config.anonKey}`
+          }
+        });
+        
+        log(logId, '📦 Response status: ' + response.status, 'warning');
+        
+        if (!response.ok) {
+          log(logId, '❌ Error en query: ' + response.statusText, 'error');
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (!data || data.length === 0) {
+          log(logId, '❌ Usuario NO encontrado en Supabase', 'error');
+          log(logId, '⚠️ Esto significa que el INSERT anterior falló silenciosamente', 'warning');
+          return;
+        }
+        
+        log(logId, '✅ Usuario encontrado en Supabase', 'success');
+        log(logId, 'Datos: ' + JSON.stringify(data[0]), 'success');
+        
+      } catch (e) {
+        log(logId, '💥 Exception: ' + e.message, 'error');
+      }
+    }
+
+    async function testFullFlow() {
+      const logId = 'log4';
+      document.getElementById(logId).innerHTML = '';
+      
+      try {
+        const email = document.getElementById('testEmail').value;
+        const password = 'TestPass123!';
+        
+        if (!email) {
+          log(logId, '❌ Por favor ingresa un email', 'error');
+          return;
+        }
+        
+        log(logId, '🚀 Iniciando flujo completo para: ' + email, 'warning');
+        
+        const config = window._SUPABASE_CONFIG;
+        if (!config) {
+          log(logId, '❌ Config no disponible', 'error');
+          return;
+        }
+        
+        // Paso 1: Crear usuario en auth.users
+        log(logId, '📝 Paso 1: Creando usuario en auth.users...', 'warning');
+        
+        const authResponse = await fetch(
+          `${config.url}/auth/v1/signup`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': config.anonKey
+            },
+            body: JSON.stringify({
+              email: email.toLowerCase(),
+              password: password,
+              data: {
+                role: 'cliente'
+              }
+            })
+          }
+        );
+        
+        log(logId, '📦 Auth signup status: ' + authResponse.status, 'warning');
+        
+        if (!authResponse.ok) {
+          const errorData = await authResponse.json().catch(() => ({}));
+          log(logId, '❌ Auth signup falló: ' + JSON.stringify(errorData), 'error');
+          return;
+        }
+        
+        const authData = await authResponse.json();
+        const userId = authData.user.id;
+        log(logId, '✅ Usuario creado en auth.users: ' + userId, 'success');
+        
+        // Paso 2: Insertar perfil en profiles
+        log(logId, '📝 Paso 2: Insertando perfil en profiles...', 'warning');
+        
+        const profile = {
+          id: userId, // Usar el ID de auth.users
+          email: email.toLowerCase(),
+          role: 'cliente',
+          nombre: 'Debug Test User',
+          puntos: 100,
+          metadata: {
+            test: true,
+            timestamp: new Date().toISOString()
+          }
+        };
+        
+        // Usar PATCH para actualizar el registro existente (Supabase lo crea automáticamente)
+        const insertResponse = await fetch(
+          `${config.url}/rest/v1/profiles?id=eq.${userId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': config.anonKey,
+              'Authorization': `Bearer ${config.anonKey}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(profile)
+          }
+        );
+        
+        log(logId, '📦 Insert profiles status: ' + insertResponse.status, 'warning');
+        
+        if (!insertResponse.ok) {
+          const errorData = await insertResponse.json().catch(() => ({}));
+          log(logId, '❌ UPDATE falló: ' + JSON.stringify(errorData), 'error');
+          return;
+        }
+        
+        log(logId, '✅ Perfil actualizado correctamente', 'success');
+        
+        // Paso 3: Verificar que existe
+        log(logId, '📝 Paso 3: Verificando que el usuario existe en Supabase...', 'warning');
+        
+        const checkUrl = new URL(`${config.url}/rest/v1/profiles`);
+        checkUrl.searchParams.append('email', `eq.${email.toLowerCase()}`);
+        checkUrl.searchParams.append('select', '*');
+        
+        const checkResponse = await fetch(checkUrl.toString(), {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey,
+            'Authorization': `Bearer ${config.anonKey}`
+          }
+        });
+        
+        if (!checkResponse.ok) {
+          log(logId, '❌ Error verificando: ' + checkResponse.statusText, 'error');
+          return;
+        }
+        
+        const checkData = await checkResponse.json();
+        
+        if (!checkData || checkData.length === 0) {
+          log(logId, '❌ CRÍTICO: Usuario NO aparece en query después de insert', 'error');
+          return;
+        }
+        
+        log(logId, '✅✅✅ ÉXITO COMPLETO: Usuario creado y verificado', 'success');
+        log(logId, 'Puedes intentar login con: ' + email + ' / ' + password, 'success');
+        
+      } catch (e) {
+        log(logId, '💥 Exception: ' + e.message, 'error');
+        log(logId, 'Stack: ' + e.stack, 'error');
+      }
+    }
+  </script>
+</body>
+</html>
