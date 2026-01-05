@@ -66,10 +66,9 @@ const AuthService = {
     return uuid.join('');
   },
 
-  // Iniciar sesión usando Supabase cuando esté disponible; si no, fallback local
+  // Iniciar sesión usando Supabase Auth API
   async signIn(email, password) {
     // IMPORTANTE: signIn DEBE usar Supabase siempre para login
-    // Solo si Supabase está completamente indisponible, usar fallback
     if (!this.isSupabaseEnabled()) {
       console.error('[AuthService] ❌ CRÍTICO: Supabase no está disponible. No se puede iniciar sesión.');
       return { 
@@ -81,17 +80,49 @@ const AuthService = {
     try {
       console.log('[AuthService] 🔐 Intentando signIn con Supabase para:', email);
       
-      // MÉTODO: Consulta directa a profiles usando FETCH (como en signUp)
-      console.log('[AuthService] 📍 Consultando profiles desde Supabase via FETCH...');
-      
       const config = window._SUPABASE_CONFIG;
       if (!config) {
         console.error('[AuthService] ❌ Config de Supabase no disponible');
         return { success: false, message: 'Configuración de Supabase no disponible' };
       }
 
+      // Paso 1: Autenticar contra Supabase usando la API de Auth
+      console.log('[AuthService] 📝 Validando credenciales contra Supabase...');
+      
+      const authResponse = await fetch(
+        `${config.url}/auth/v1/token?grant_type=password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey
+          },
+          body: JSON.stringify({
+            email: email.toLowerCase(),
+            password: password
+          })
+        }
+      );
+
+      console.log('[AuthService] 📦 Auth response status:', authResponse.status);
+
+      if (!authResponse.ok) {
+        const errorData = await authResponse.json().catch(() => ({}));
+        console.error('[AuthService] ❌ Error en auth:', errorData);
+        return { success: false, message: 'Usuario o contraseña incorrectos' };
+      }
+
+      const authData = await authResponse.json();
+      const userId = authData.user.id;
+      const accessToken = authData.access_token;
+
+      console.log('[AuthService] ✅ Autenticación exitosa, userId:', userId);
+
+      // Paso 2: Obtener datos del perfil desde Supabase
+      console.log('[AuthService] 📍 Consultando datos del perfil desde Supabase...');
+      
       const queryUrl = new URL(`${config.url}/rest/v1/profiles`);
-      queryUrl.searchParams.append('email', `eq.${email.toLowerCase()}`);
+      queryUrl.searchParams.append('id', `eq.${userId}`);
       queryUrl.searchParams.append('select', '*');
 
       const queryResponse = await fetch(queryUrl.toString(), {
@@ -99,52 +130,28 @@ const AuthService = {
         headers: {
           'Content-Type': 'application/json',
           'apikey': config.anonKey,
-          'Authorization': `Bearer ${config.anonKey}`
+          'Authorization': `Bearer ${accessToken}`
         }
       });
 
       console.log('[AuthService] 📦 Query status:', queryResponse.status);
 
       if (!queryResponse.ok) {
-        console.error('[AuthService] ❌ Error en query:', queryResponse.statusText);
-        return { success: false, message: 'Error consultando credenciales: ' + queryResponse.statusText };
+        console.error('[AuthService] ❌ Error consultando perfil');
+        return { success: false, message: 'Error consultando perfil' };
       }
 
       const profiles = await queryResponse.json();
-      console.log('[AuthService] 📊 Perfiles encontrados:', profiles?.length || 0);
 
       if (!profiles || profiles.length === 0) {
-        console.error('[AuthService] ❌ Usuario no encontrado en Supabase:', email);
-        console.log('[AuthService] 🔄 Intentando verificar credenciales en localStorage...');
-        
-        // Verificar en localStorage como último recurso
-        const localUsers = this.obtenerUsuarios();
-        const localUser = localUsers.find(u => u.email === email.toLowerCase() && u.password === password);
-        
-        if (localUser) {
-          console.log('[AuthService] ⚠️ Usuario encontrado en localStorage pero NO en Supabase');
-          console.log('[AuthService] Esto indica un error en el registro. El usuario debe registrarse de nuevo.');
-          return { success: false, message: 'Usuario no registrado correctamente en la base de datos. Por favor, registrate de nuevo.' };
-        }
-        
-        return { success: false, message: 'Usuario o contraseña incorrectos' };
+        console.error('[AuthService] ❌ Perfil no encontrado');
+        return { success: false, message: 'Perfil no encontrado' };
       }
 
       const profileData = profiles[0];
       console.log('[AuthService] ✅ Perfil encontrado:', profileData.email);
-      
-      // Validar contraseña localmente
-      const localUsers = this.obtenerUsuarios();
-      const localUser = localUsers.find(u => u.email === email.toLowerCase() && u.password === password);
 
-      if (!localUser) {
-        console.error('[AuthService] ❌ Credenciales incorrectas');
-        return { success: false, message: 'Usuario o contraseña incorrectos' };
-      }
-
-      console.log('[AuthService] ✅ Contraseña válida');
-
-      // Construir objeto usuario final con datos de Supabase
+      // Construir objeto usuario final
       let usuarioFinal = {
         id: profileData.id,
         email: profileData.email,
@@ -153,7 +160,7 @@ const AuthService = {
         puntos: profileData.puntos || 0
       };
 
-      // Si es tienda, cargar datos de la tienda desde tabla stores
+      // Paso 3: Si es tienda, cargar datos de la tienda desde tabla stores
       if (profileData.role === 'tienda') {
         console.log('[AuthService] 🏪 Usuario es tienda, cargando datos de stores...');
         try {
@@ -166,7 +173,7 @@ const AuthService = {
             headers: {
               'Content-Type': 'application/json',
               'apikey': config.anonKey,
-              'Authorization': `Bearer ${config.anonKey}`
+              'Authorization': `Bearer ${accessToken}`
             }
           });
 
@@ -256,6 +263,9 @@ const AuthService = {
 
       console.log('[AuthService] 📡 Auth signup response status:', authResponse.status);
 
+      let userId;
+      let authData;
+
       if (!authResponse.ok) {
         const errorData = await authResponse.json().catch(() => ({}));
         console.error('[AuthService] ❌ Error en auth signup:', {
@@ -263,24 +273,160 @@ const AuthService = {
           error: errorData
         });
 
-        // Error 422 = usuario ya existe
+        // Error 422 = puede ser usuario existente O contraseña débil/inválida
         if (authResponse.status === 422) {
+          // Analizar el mensaje de error para determinar la causa real
+          const errorMsg = errorData.error_description || errorData.message || errorData.msg || JSON.stringify(errorData) || '';
+          console.warn('[AuthService] ⚠️ Error 422 detectado. Datos completos:', errorData);
+          console.warn('[AuthService] ⚠️ Mensaje extraído:', errorMsg);
+          
+          // Si el error menciona contraseña, es un problema de validación de contraseña
+          if (errorMsg.toLowerCase().includes('password') || errorMsg.toLowerCase().includes('weak') || errorMsg.toLowerCase().includes('strength')) {
+            console.error('[AuthService] ❌ Contraseña rechazada por Supabase:', errorMsg);
+            return { 
+              success: false, 
+              message: 'La contraseña no cumple con los requisitos de seguridad. Usa una contraseña con al menos 8 caracteres, incluyendo mayúsculas, números y caracteres especiales.' 
+            };
+          }
+          
+          // Si menciona email o user existe, es un usuario duplicado
+          if (errorMsg.toLowerCase().includes('user') || errorMsg.toLowerCase().includes('email') || errorMsg.toLowerCase().includes('exist')) {
+            console.warn('[AuthService] ⚠️ Usuario ya existe en auth.users, intentando recuperar...');
+          } else if (errorMsg === '' || errorMsg === '{}') {
+            // Error vacío - probablemente contraseña muy débil o requisito de Supabase
+            console.error('[AuthService] ❌ Error 422 sin mensaje. Probablemente validación de contraseña o email duplicado sin descripción.');
+            
+            // Intentar determinar si es email duplicado intentando login
+            const testLoginResponse = await fetch(
+              `${config.url}/auth/v1/token?grant_type=password`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': config.anonKey
+                },
+                body: JSON.stringify({
+                  email: email.toLowerCase(),
+                  password: password
+                })
+              }
+            );
+
+            if (testLoginResponse.ok) {
+              // Usuario existe y las credenciales son válidas
+              console.log('[AuthService] ℹ️ Error 422 pero login funciona, probablemente email duplicado con credenciales coincidentes');
+              // Continuar con el flujo de usuario existente abajo
+            } else {
+              const loginError = await testLoginResponse.json().catch(() => ({}));
+              const loginMsg = loginError.error_description || loginError.message || '';
+              
+              if (loginMsg.toLowerCase().includes('invalid') || loginMsg.toLowerCase().includes('credentials')) {
+                return { 
+                  success: false, 
+                  message: 'Este email ya está registrado con una contraseña diferente. Si es tu email, intenta iniciar sesión o recupera tu contraseña.' 
+                };
+              }
+              
+              return { 
+                success: false, 
+                message: 'La contraseña no cumple con los requisitos mínimos de Supabase. Intenta una contraseña más compleja (mínimo 8 caracteres con mayúsculas, números y símbolos).' 
+              };
+            }
+          } else {
+            // Otros errores 422 que no entendemos
+            console.error('[AuthService] ❌ Error 422 desconocido:', errorMsg);
+            return { 
+              success: false, 
+              message: `Error en el registro: ${errorMsg || 'Verifica que el email sea válido y la contraseña cumpla requisitos de seguridad'}` 
+            };
+          }
+          
+          // Intentaremos login para verificar credenciales (si realmente es usuario duplicado)
+          const testLoginResponse = await fetch(
+            `${config.url}/auth/v1/token?grant_type=password`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': config.anonKey
+              },
+              body: JSON.stringify({
+                email: email.toLowerCase(),
+                password: password
+              })
+            }
+          );
+
+          if (testLoginResponse.ok) {
+            const tokenData = await testLoginResponse.json();
+            userId = tokenData.user?.id;
+            console.log('[AuthService] ✅ Usuario existe y credenciales son válidas, ID:', userId);
+            
+            // Usuario ya existe con las credenciales correctas
+            // Simplemente actualizar su perfil
+            authData = { user: { id: userId, email: email.toLowerCase() } };
+          } else {
+            // Las credenciales no funcionan, pero el usuario existe
+            // Intentaremos obtener el ID desde la tabla profiles buscando por email
+            console.warn('[AuthService] ⚠️ Usuario existe pero credenciales no coinciden, buscando en profiles...');
+            
+            try {
+              const profileQuery = new URL(`${config.url}/rest/v1/profiles`);
+              profileQuery.searchParams.append('email', `eq.${email.toLowerCase()}`);
+              profileQuery.searchParams.append('select', 'id');
+              
+              const profileResponse = await fetch(profileQuery.toString(), {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': config.anonKey
+                }
+              });
+              
+              if (profileResponse.ok) {
+                const profiles = await profileResponse.json();
+                if (profiles && profiles.length > 0) {
+                  userId = profiles[0].id;
+                  console.log('[AuthService] ✅ Usuario encontrado en profiles, ID:', userId);
+                  console.warn('[AuthService] ⚠️ NOTA: Email registrado con contraseña diferente. Se actualizará el perfil con los datos nuevos.');
+                  authData = { user: { id: userId, email: email.toLowerCase() } };
+                } else {
+                  return { 
+                    success: false, 
+                    message: 'Este email ya está registrado pero no se puede acceder con las credenciales proporcionadas' 
+                  };
+                }
+              } else {
+                return { 
+                  success: false, 
+                  message: 'Este email ya está registrado pero no se puede acceder con las credenciales proporcionadas' 
+                };
+              }
+            } catch (err) {
+              console.error('[AuthService] Error buscando en profiles:', err);
+              return { 
+                success: false, 
+                message: 'Este email ya está registrado pero no se puede verificar' 
+              };
+            }
+          }
+        } else {
           return { 
             success: false, 
-            message: 'Este email ya está registrado' 
+            message: `Error en auth: ${errorData.error_description || errorData.message || authResponse.statusText}` 
           };
         }
-
-        return { 
-          success: false, 
-          message: `Error en auth: ${errorData.error_description || errorData.message || authResponse.statusText}` 
-        };
+      } else {
+        authData = await authResponse.json();
+        userId = authData.user.id;
+        console.log('[AuthService] ✅ Usuario creado en auth.users:', userId);
       }
 
-      const authData = await authResponse.json();
-      console.log('[AuthService] ✅ Usuario creado en auth.users:', authData.user?.id);
-
-      const userId = authData.user.id;
+      console.log('[AuthService] 🔐 Datos de auth:', {
+        email: authData.user?.email,
+        id: userId,
+        confirmed_at: authData.user?.confirmed_at
+      });
 
       // Paso 2: Actualizar perfil en tabla profiles (Supabase crea uno automáticamente)
       const profile = {
@@ -380,9 +526,35 @@ const AuthService = {
         puntos: profile.puntos
       };
 
-      console.log('[AuthService] 💾 Guardando credenciales en localStorage...');
+      console.log('[AuthService] 💾 Intentando validar credenciales inmediatamente...');
       
-      // Guardar credenciales para validación local
+      // Intentar login inmediato para verificar si funciona
+      const testAuthResponse = await fetch(
+        `${config.url}/auth/v1/token?grant_type=password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey
+          },
+          body: JSON.stringify({
+            email: email.toLowerCase(),
+            password: password
+          })
+        }
+      );
+
+      console.log('[AuthService] 📦 Test auth response status:', testAuthResponse.status);
+
+      if (!testAuthResponse.ok) {
+        const errorData = await testAuthResponse.json().catch(() => ({}));
+        console.warn('[AuthService] ⚠️ Login inmediato falló:', errorData);
+        console.warn('[AuthService] Esto puede indicar que el email requiere confirmación o hay otro problema.');
+      } else {
+        console.log('[AuthService] ✅ Login inmediato funcionó correctamente');
+      }
+
+      // Guardar credenciales para respaldo local (solo para debugging)
       const usuarios = this.obtenerUsuarios();
       usuarios.push({ email: email.toLowerCase(), password, role });
       this.guardarUsuarios(usuarios);
@@ -507,6 +679,99 @@ const AuthService = {
     }
     
     return { success: false, message: "Usuario no encontrado" };
+  },
+
+  // Actualizar datos de tienda en Supabase y localStorage
+  async actualizarTiendaEnSupabase(usuarioActualizado) {
+    if (!this.isSupabaseEnabled()) {
+      console.error('[AuthService] ❌ Supabase no está disponible');
+      return { success: false, message: 'No hay conexión a Supabase' };
+    }
+
+    try {
+      const config = window._SUPABASE_CONFIG;
+      if (!config) {
+        console.error('[AuthService] ❌ Config de Supabase no disponible');
+        return { success: false, message: 'Configuración de Supabase no disponible' };
+      }
+
+      const userId = usuarioActualizado.id;
+      if (!userId) {
+        return { success: false, message: 'ID de usuario no disponible' };
+      }
+
+      console.log('[AuthService] 🔄 Actualizando tienda en Supabase:', userId);
+
+      // Actualizar tabla stores con los nuevos datos de tienda
+      if (usuarioActualizado.tienda) {
+        const storeData = {
+          nombre: usuarioActualizado.tienda.nombre,
+          descripcion: usuarioActualizado.tienda.descripcion || '',
+          contacto: {
+            telefono: usuarioActualizado.tienda.telefono || '',
+            direccion: usuarioActualizado.tienda.direccion || '',
+            horario: usuarioActualizado.tienda.horario || '',
+            responsable: usuarioActualizado.tienda.responsable || ''
+          }
+        };
+
+        console.log('[AuthService] 📝 Actualizando store:', storeData);
+
+        // Buscar el store del usuario primero
+        const queryUrl = new URL(`${config.url}/rest/v1/stores`);
+        queryUrl.searchParams.append('owner_id', `eq.${userId}`);
+        queryUrl.searchParams.append('select', 'id');
+
+        const queryResponse = await fetch(queryUrl.toString(), {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey
+          }
+        });
+
+        if (queryResponse.ok) {
+          const stores = await queryResponse.json();
+          
+          if (stores && stores.length > 0) {
+            // Actualizar el store existente
+            const storeId = stores[0].id;
+            const updateResponse = await fetch(
+              `${config.url}/rest/v1/stores?id=eq.${storeId}`,
+              {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': config.anonKey,
+                  'Authorization': `Bearer ${config.anonKey}`,
+                  'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(storeData)
+              }
+            );
+
+            console.log('[AuthService] 📡 Respuesta UPDATE store - Status:', updateResponse.status);
+
+            if (!updateResponse.ok) {
+              const errorData = await updateResponse.json().catch(() => ({}));
+              console.error('[AuthService] ❌ Error actualizando store:', errorData);
+              return { success: false, message: 'Error actualizando tienda en Supabase' };
+            }
+
+            console.log('[AuthService] ✅ Store actualizado en Supabase');
+          }
+        }
+      }
+
+      // Actualizar localStorage
+      this.actualizarUsuario(usuarioActualizado);
+      console.log('[AuthService] ✅✅✅ Tienda actualizada exitosamente');
+      return { success: true, message: 'Tienda actualizada en Supabase' };
+
+    } catch (e) {
+      console.error('[AuthService] 💥 Exception al actualizar tienda:', e);
+      return { success: false, message: 'Error: ' + e.message };
+    }
   },
 
   // Buscar usuario por email

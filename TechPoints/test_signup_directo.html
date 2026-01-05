@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test SignUp Directo</title>
+  <style>
+    body { font-family: monospace; padding: 20px; }
+    .log { background: #222; color: #0f0; padding: 10px; border-radius: 4px; max-height: 400px; overflow-y: auto; margin: 10px 0; }
+    .success { color: #4caf50; }
+    .error { color: #f44336; }
+    button { padding: 10px 20px; margin: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test SignUp Directo</h1>
+  
+  <div>
+    <input type="email" id="testEmail" placeholder="Email" value="directtest@gmail.com">
+    <input type="password" id="testPassword" placeholder="Password" value="TestPass123!">
+    <button onclick="testSignUp()">Test SignUp</button>
+  </div>
+
+  <div id="log" class="log"></div>
+
+  <script src="./assets/vendor/supabase.min.js"></script>
+  <script src="./assets/js/supabaseClient.js"></script>
+  <script src="./assets/js/services/StorageService.js"></script>
+  <script src="./assets/js/authservice.js"></script>
+
+  <script>
+    function log(msg, type = 'normal') {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      const line = `[${timestamp}] ${msg}`;
+      logDiv.innerHTML += `<div class="${type}">${line}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(line);
+    }
+
+    async function testSignUp() {
+      const email = document.getElementById('testEmail').value;
+      const password = document.getElementById('testPassword').value;
+      
+      document.getElementById('log').innerHTML = '';
+      
+      log('🚀 Llamando AuthService.signUp directamente...', 'warning');
+      
+      try {
+        const result = await AuthService.signUp(email, password, 'cliente', null);
+        
+        log('📊 Resultado: ' + JSON.stringify(result), result.success ? 'success' : 'error');
+        
+        if (result.success) {
+          log('✅✅✅ ÉXITO', 'success');
+          log('Usuario registrado: ' + email, 'success');
+        }
+      } catch (e) {
+        log('💥 Exception: ' + e.message, 'error');
+      }
+    }
+
+    log('📍 Página de test lista. Verifica que Supabase esté inicializado.', 'warning');
+  </script>
+</body>
+</html>

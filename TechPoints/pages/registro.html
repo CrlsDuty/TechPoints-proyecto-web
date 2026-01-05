@@ -109,10 +109,15 @@
       const validation = ValidationService.validarPasswordFuerte(pwd);
       const strength = calcularFortaleza(pwd);
 
-      errSpan.textContent = !validation.valido ? validation.mensaje : '';
+      // Mostrar advertencia si no es lo suficientemente fuerte
+      if (!validation.valido) {
+        errSpan.textContent = 'Requisitos: Mínimo 8 caracteres, 1 mayúscula, 1 número, 1 símbolo (!@#$%^&*)';
+      } else {
+        errSpan.textContent = '';
+      }
       
       const colors = ['#d32f2f', '#ff9800', '#fbc02d', '#8bc34a'];
-      const labels = ['Débil', 'Regular', 'Buena', 'Fuerte'];
+      const labels = ['Muy débil', 'Débil', 'Buena', 'Fuerte'];
       const color = colors[strength];
       const label = labels[strength];
 

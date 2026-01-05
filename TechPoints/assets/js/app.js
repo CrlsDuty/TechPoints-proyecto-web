@@ -136,26 +136,24 @@ function inicializarLogin(formLogin) {
 
 // ========== REGISTRO ==========
 function inicializarRegistro(formRegistro) {
-  // Mostrar/ocultar campos de tienda según el rol seleccionado
   const roleSelect = document.getElementById("role");
   const storeFields = document.getElementById("storeFields");
+  
   if (roleSelect && storeFields) {
-    const toggleStoreFields = () => {
-      storeFields.style.display = roleSelect.value === 'tienda' ? 'block' : 'none';
-    };
-    roleSelect.addEventListener('change', toggleStoreFields);
-    toggleStoreFields();
+    roleSelect.addEventListener('change', function() {
+      storeFields.style.display = this.value === 'tienda' ? 'block' : 'none';
+    });
+    storeFields.style.display = roleSelect.value === 'tienda' ? 'block' : 'none';
   }
 
-  formRegistro.addEventListener("submit", e => {
+  formRegistro.addEventListener("submit", async function(e) {
     e.preventDefault();
 
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
     const role = document.getElementById("role").value;
-    const submitBtn = formRegistro.querySelector('button[type="submit"]');
+    const submitBtn = this.querySelector('button[type="submit"]');
 
-    // Recopilar información adicional si es tienda
     const tiendaInfo = role === 'tienda' ? {
       nombre: document.getElementById("nombreTienda")?.value.trim() || '',
       direccion: document.getElementById("direccionTienda")?.value.trim() || '',
@@ -164,66 +162,28 @@ function inicializarRegistro(formRegistro) {
       responsable: document.getElementById("responsableTienda")?.value.trim() || ''
     } : null;
 
-    // --- Validaciones ---
-    const inputEmail = document.getElementById('email');
-    const inputPassword = document.getElementById('password');
-    const inputNombreTienda = document.getElementById('nombreTienda');
-    const inputTelefonoTienda = document.getElementById('telefonoTienda');
-    const errNombre = document.getElementById('err-nombreTienda');
-    const errTelefono = document.getElementById('err-telefonoTienda');
-
-    const setFieldError = (inputEl, msgEl, message) => {
-      if (inputEl) inputEl.classList.add('input-error');
-      if (msgEl) msgEl.textContent = message;
-      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(message, 'warning');
-    };
-
-    const clearFieldError = (inputEl, msgEl) => {
-      if (inputEl) inputEl.classList.remove('input-error');
-      if (msgEl) msgEl.textContent = '';
-    };
-
-    // limpiar errores al escribir
-    [inputEmail, inputPassword, inputNombreTienda, inputTelefonoTienda].forEach(el => {
-      if (!el) return;
-      el.addEventListener('input', () => clearFieldError(el, document.getElementById('err-' + el.id)));
-    });
-
-    // Validar rol
     if (!role) {
       if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Por favor selecciona un tipo de cuenta', 'warning');
       return;
     }
 
-    // Validar email
     if (!AuthService.validarEmail(email)) {
-      setFieldError(inputEmail, null, 'Email inválido');
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Email inválido', 'warning');
       return;
     }
 
-    // Verificar si email ya existe
-    if (AuthService.buscarUsuarioPorEmail(email)) {
-      setFieldError(inputEmail, null, 'Este correo ya está registrado');
-      return;
-    }
-
-    // Validar contraseña mínima
     if (!password || password.length < 4) {
-      setFieldError(inputPassword, null, 'La contraseña debe tener al menos 4 caracteres');
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('La contraseña debe tener al menos 4 caracteres', 'warning');
       return;
     }
 
-    // Validaciones básicas para tiendas: requerir nombre y teléfono
     if (role === 'tienda') {
       if (!tiendaInfo.nombre) {
-        setFieldError(inputNombreTienda, errNombre, 'El nombre de la tienda es requerido');
-        (inputNombreTienda || inputEmail).focus();
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El nombre de la tienda es requerido', 'warning');
         return;
       }
-
       if (!tiendaInfo.telefono) {
-        setFieldError(inputTelefonoTienda, errTelefono, 'El teléfono o contacto es requerido');
-        (inputTelefonoTienda || inputNombreTienda || inputEmail).focus();
+        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El teléfono es requerido', 'warning');
         return;
       }
     }
@@ -231,31 +191,33 @@ function inicializarRegistro(formRegistro) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Registrando...';
 
-    // Demostración de callback (Utils.delayWithCallback)
-    if (window.Utils && typeof Utils.delayWithCallback === 'function') {
-      Utils.delayWithCallback(400, () => {
-        const resultado = AuthService.registrarUsuario(email, password, role, tiendaInfo);
-
-        if (resultado.success) {
-          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message + ' Redirigiendo...', 'success');
-          setTimeout(() => window.location.href = 'login.html', 600);
-        } else {
-          if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Registrarse';
-        }
-      });
-    } else {
-      // Fallback síncrono
-      const resultado = AuthService.registrarUsuario(email, password, role, tiendaInfo);
+    console.log('[Registro] 🚀 Llamando AuthService.signUp con email:', email, 'role:', role);
+    
+    try {
+      const resultado = await AuthService.signUp(email, password, role, tiendaInfo);
+      console.log('[Registro] 📊 Resultado de signUp:', resultado);
+      
       if (resultado.success) {
-        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message + " Redirigiendo al login...", 'success');
-        setTimeout(() => window.location.href = 'login.html', 1000);
+        console.log('[Registro] ✅ Usuario registrado exitosamente en Supabase');
+        if (Utils && typeof Utils.mostrarToast === 'function') {
+          Utils.mostrarToast('Registro exitoso. Redirigiendo...', 'success');
+        }
+        setTimeout(() => window.location.href = 'login.html', 1500);
       } else {
-        if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message, 'error');
+        console.error('[Registro] ❌ Error en signup:', resultado.message);
+        if (Utils && typeof Utils.mostrarToast === 'function') {
+          Utils.mostrarToast(resultado.message || 'Error en el registro', 'error');
+        }
         submitBtn.disabled = false;
         submitBtn.textContent = 'Registrarse';
       }
+    } catch (e) {
+      console.error('[Registro] 💥 Exception en signUp:', e);
+      if (Utils && typeof Utils.mostrarToast === 'function') {
+        Utils.mostrarToast('Error inesperado: ' + e.message, 'error');
+      }
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Registrarse';
     }
   });
 }
@@ -691,14 +653,27 @@ function configurarEditarPerfil(usuarioActivo) {
 
     // Actualizar usuario con nueva información de tienda
     const usuarioActualizado = { ...usuarioActivo, tienda: tiendaActualizada };
-    AuthService.actualizarUsuario(usuarioActualizado);
+    
+    // Mostrar estado de guardado
+    btnGuardar.disabled = true;
+    btnGuardar.textContent = 'Guardando...';
 
-    // Actualizar la UI
-    mostrarInfoTienda(usuarioActualizado);
+    // Guardar en Supabase
+    const resultado = await AuthService.actualizarTiendaEnSupabase(usuarioActualizado);
 
-    // Cerrar modal y mostrar toast
-    cerrarModal();
-    if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Perfil actualizado correctamente', 'success');
+    if (resultado.success) {
+      // Actualizar la UI
+      mostrarInfoTienda(usuarioActualizado);
+
+      // Cerrar modal y mostrar toast
+      cerrarModal();
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Perfil actualizado en Supabase correctamente', 'success');
+    } else {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast(resultado.message || 'Error al actualizar', 'error');
+    }
+
+    btnGuardar.disabled = false;
+    btnGuardar.textContent = 'Guardar cambios';
   });
 }
 
