@@ -381,6 +381,26 @@ const ProductService = {
 
         console.log('[ProductService] ✅ Canje completado exitosamente');
 
+        // Registrar cambio de puntos en points_transactions
+        if (window.TransactionService && typeof TransactionService.registrarCambioPuntos === 'function') {
+          try {
+            await TransactionService.registrarCambioPuntos(
+              perfil.id,
+              perfil.puntos,
+              nuevosPuntos,
+              'canje',
+              {
+                producto: producto.nombre,
+                productId: producto.id,
+                cliente: clienteEmail,
+                puntosUsados: producto.costo_puntos
+              }
+            );
+          } catch (e) {
+            console.warn('[ProductService] Advertencia al registrar cambio de puntos:', e.message);
+          }
+        }
+
         // Registrar transacción localmente (auditoría)
         if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
           try {

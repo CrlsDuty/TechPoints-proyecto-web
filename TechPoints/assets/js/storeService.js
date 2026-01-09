@@ -28,6 +28,7 @@ const StoreService = {
         // Actualizar puntos directamente en profiles con fetch POST
         const puntosInt = parseInt(puntos);
         const nuevosPuntos = (perfil.puntos || 0) + puntosInt;
+        const puntosAnteriores = perfil.puntos || 0;
         
         const url = `${window.supabase.url}/rest/v1/profiles?id=eq.${perfil.id}`;
         const headers = {
@@ -53,15 +54,27 @@ const StoreService = {
           const data = await response.json();
           console.log('[StoreService] ✅ Puntos agregados a Supabase:', data);
           
-          // Registrar transacción localmente
-          if (window.EventBus && typeof EventBus.emit === 'function') {
+          // Registrar cambio de puntos en points_transactions
+          if (window.TransactionService && typeof TransactionService.registrarCambioPuntos === 'function') {
             try {
-              EventBus.emit('puntos-agregados', perfil);
+              const tienda = AuthService.obtenerUsuarioActivo()?.email || 'desconocida';
+              await TransactionService.registrarCambioPuntos(
+                perfil.id,
+                puntosAnteriores,
+                nuevosPuntos,
+                'compra-puntos',
+                {
+                  cliente: clienteEmail,
+                  tienda: tienda,
+                  puntosAgregados: puntosInt
+                }
+              );
             } catch (e) {
-              console.warn('EventBus emit failed (puntos-agregados)', e);
+              console.warn('[StoreService] Advertencia al registrar cambio de puntos:', e.message);
             }
           }
-
+          
+          // Registrar transacción
           if (window.TransactionService && typeof TransactionService.registrarTransaccion === 'function') {
             try {
               const tienda = AuthService.obtenerUsuarioActivo()?.email || 'desconocida';
@@ -72,6 +85,15 @@ const StoreService = {
               });
             } catch (e) {
               console.warn('Failed to register transaction (compra-puntos)', e);
+            }
+          }
+          
+          // Emitir evento
+          if (window.EventBus && typeof EventBus.emit === 'function') {
+            try {
+              EventBus.emit('puntos-agregados', perfil);
+            } catch (e) {
+              console.warn('EventBus emit failed (puntos-agregados)', e);
             }
           }
 

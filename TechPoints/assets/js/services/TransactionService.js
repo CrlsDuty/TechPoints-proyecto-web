@@ -6,8 +6,112 @@
 
 const TransactionService = {
   /**
+   * Verificar si Supabase está disponible
+   */
+  isSupabaseEnabled() {
+    return typeof window.supabase !== 'undefined' && window.supabase !== null;
+  },
+
+  /**
+   * Obtener token de sesión autenticada
+   * @private
+   */
+  async _obtenerTokenAutenticado() {
+    try {
+      // Intentar obtener sesión de Supabase primero
+      const supabase = window.supabase;
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.access_token) {
+          console.log('[TransactionService] ✅ Token obtenido de Supabase.getSession()');
+          return session.access_token;
+        }
+      }
+
+      // Intentar obtener del usuario activo
+      const usuarioActivo = AuthService.obtenerUsuarioActivo();
+      if (usuarioActivo) {
+        // Buscar token en varias ubicaciones posibles del usuario activo
+        if (usuarioActivo.session?.access_token) {
+          console.log('[TransactionService] ✅ Token obtenido de AuthService.session.access_token');
+          return usuarioActivo.session.access_token;
+        }
+        if (usuarioActivo.access_token) {
+          console.log('[TransactionService] ✅ Token obtenido de AuthService.access_token');
+          return usuarioActivo.access_token;
+        }
+      }
+
+      // Buscar en localStorage con clave específica de auth
+      const storageKey = 'auth_usuario_activo';
+      const datosGuardados = localStorage.getItem(storageKey);
+      if (datosGuardados) {
+        try {
+          const datos = JSON.parse(datosGuardados);
+          if (datos.session?.access_token) {
+            console.log('[TransactionService] ✅ Token obtenido de localStorage.session.access_token');
+            return datos.session.access_token;
+          }
+          if (datos.access_token) {
+            console.log('[TransactionService] ✅ Token obtenido de localStorage.access_token');
+            return datos.access_token;
+          }
+        } catch (parseError) {
+          console.error('[TransactionService] Error parseando localStorage:', parseError);
+        }
+      }
+
+      // Buscar en Supabase's standard localStorage keys (sb-auth-token)
+      const sbAuthTokenKey = 'sb-auth-token';
+      const sbAuthToken = localStorage.getItem(sbAuthTokenKey);
+      if (sbAuthToken) {
+        try {
+          // Intenta primero como JSON
+          let tokenData;
+          try {
+            tokenData = JSON.parse(sbAuthToken);
+          } catch (e) {
+            // Si no es JSON, podría ser un string directo
+            tokenData = { access_token: sbAuthToken };
+          }
+          
+          if (tokenData.access_token) {
+            console.log('[TransactionService] ✅ Token obtenido de sb-auth-token');
+            return tokenData.access_token;
+          }
+        } catch (e) {
+          console.warn('[TransactionService] ⚠️ Error procesando sb-auth-token:', e.message);
+        }
+      }
+
+      // Buscar en cualquier clave de localStorage que contenga 'sb-' y 'auth-token'
+      const sbStorageKeys = Object.keys(localStorage).filter(k => 
+        k.includes('sb-') && k.includes('auth-token')
+      );
+      
+      for (const key of sbStorageKeys) {
+        try {
+          const sbSession = JSON.parse(localStorage.getItem(key));
+          if (sbSession && sbSession.access_token) {
+            console.log('[TransactionService] ✅ Token obtenido de localStorage key:', key);
+            return sbSession.access_token;
+          }
+        } catch (e) {
+          // continue
+        }
+      }
+
+      console.warn('[TransactionService] ⚠️ No se pudo obtener token de ninguna fuente');
+      return null;
+    } catch (e) {
+      console.error('[TransactionService] 💥 Exception obteniendo token:', e);
+      return null;
+    }
+  },
+
+  /**
    * Registrar una nueva transacción
-   * @param {string} tipo - Tipo: 'canje', 'compra-puntos', 'ajuste', 'login', 'logout'
+   * @param {string} tipo - Tipo: 'canje', 'compra-puntos', 'ajuste', 'login', 'logout', 'registro'
    * @param {Object} datos - Datos de la transacción
    * @returns {Object} Transacción registrada
    */
@@ -20,6 +124,7 @@ const TransactionService = {
       datos,
       usuario: usuarioActivo?.email || 'anónimo',
       rol: usuarioActivo?.role || 'desconocido',
+      usuarioId: usuarioActivo?.id || null,
       timestamp: new Date().toISOString(),
       estado: 'completado',
       metadata: {
@@ -30,7 +135,13 @@ const TransactionService = {
       }
     };
 
+    // Guardar localmente
     this._guardarTransaccion(transaccion);
+    
+    // Guardar en Supabase si está disponible
+    if (this.isSupabaseEnabled() && usuarioActivo?.id) {
+      this._guardarTransaccionEnSupabase(transaccion);
+    }
     
     // Emitir evento
     if (typeof EventBus !== 'undefined') {
@@ -38,6 +149,159 @@ const TransactionService = {
     }
 
     return transaccion;
+  },
+
+  /**
+   * Registrar cambio de puntos en Supabase
+   * @param {string} usuarioId - ID del usuario
+   * @param {number} puntosAnterior - Puntos anteriores
+   * @param {number} puntosNuevo - Puntos nuevos
+   * @param {string} razon - Razón del cambio
+   * @param {Object} metadata - Metadata adicional
+   */
+  async registrarCambioPuntos(usuarioId, puntosAnterior, puntosNuevo, razon, metadata = {}) {
+    if (!this.isSupabaseEnabled()) {
+      console.warn('[TransactionService] Supabase no está disponible para registrar cambio de puntos');
+      return false;
+    }
+
+    try {
+      const config = window._SUPABASE_CONFIG;
+      if (!config) return false;
+
+      // Get authenticated session token
+      const accessToken = await this._obtenerTokenAutenticado();
+      
+      if (!accessToken) {
+        console.warn('[TransactionService] No hay token autenticado para registrar cambio de puntos');
+        return false;
+      }
+
+      const cantidad = puntosNuevo - puntosAnterior;
+      
+      // Map razon to valid tipo values based on CHECK constraint:
+      // CHECK ((tipo = ANY (ARRAY['credito'::text, 'debito'::text, 'ajuste'::text, 'compra_puntos'::text])))
+      let tipoValido = 'ajuste'; // default
+      
+      if (cantidad > 0) {
+        // Points added = credit
+        tipoValido = 'credito';
+      } else if (cantidad < 0) {
+        // Points deducted = debit
+        tipoValido = 'debito';
+      }
+      
+      // Override if specific razon requires different tipo
+      const tipoMapping = {
+        'canje': 'debito',           // redeeming products = debit points
+        'compra-puntos': 'credito',   // buying points = credit points
+        'compra_puntos': 'credito',
+        'purchase': 'credito',
+        'redemption': 'debito',
+        'ajuste': 'ajuste'
+      };
+      
+      if (tipoMapping[razon]) {
+        tipoValido = tipoMapping[razon];
+      }
+      
+      const cambio = {
+        perfil_id: usuarioId,
+        tipo: tipoValido,
+        cantidad: cantidad,
+        source: {
+          puntosAnterior: puntosAnterior,
+          puntosNuevo: puntosNuevo,
+          razon: razon,
+          ...metadata
+        },
+        creado_at: new Date().toISOString()
+      };
+
+      console.log('[TransactionService] 📝 Registrando cambio de puntos en Supabase:', cambio);
+
+      const response = await fetch(
+        `${config.url}/rest/v1/points_transactions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(cambio)
+        }
+      );
+
+      if (response.ok) {
+        console.log('[TransactionService] ✅ Cambio de puntos registrado en Supabase');
+        return true;
+      } else {
+        const errorText = await response.text();
+        console.error('[TransactionService] ❌ Error registrando cambio de puntos:', errorText);
+        return false;
+      }
+    } catch (e) {
+      console.error('[TransactionService] 💥 Exception registrando cambio de puntos:', e);
+      return false;
+    }
+  },
+
+  /**
+   * Guardar transacción en Supabase
+   * @private
+   */
+  async _guardarTransaccionEnSupabase(transaccion) {
+    if (!this.isSupabaseEnabled()) return;
+
+    try {
+      const config = window._SUPABASE_CONFIG;
+      if (!config) return;
+
+      // Get authenticated session token
+      const accessToken = await this._obtenerTokenAutenticado();
+      
+      if (!accessToken) {
+        console.warn('[TransactionService] No hay token autenticado para guardar transacción');
+        return;
+      }
+
+      console.log('[TransactionService] 📝 Guardando transacción en Supabase:', transaccion.tipo);
+
+      const datosSupabase = {
+        usuario_id: transaccion.usuarioId,
+        tipo: transaccion.tipo,
+        datos: transaccion.datos,
+        rol: transaccion.rol,
+        metadata: transaccion.metadata,
+        creado_at: transaccion.timestamp
+      };
+
+      const response = await fetch(
+        `${config.url}/rest/v1/transactions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': config.anonKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(datosSupabase)
+        }
+      );
+
+      if (response.ok) {
+        console.log('[TransactionService] ✅ Transacción guardada en Supabase');
+      } else {
+        const errorText = await response.text();
+        console.warn('[TransactionService] ⚠️ Error guardando en Supabase (continuando):', errorText);
+      }
+    } catch (e) {
+      console.warn('[TransactionService] ⚠️ Exception guardando en Supabase (continuando):', e.message);
+      // No lanzar error, solo loguear
+    }
   },
 
   /**

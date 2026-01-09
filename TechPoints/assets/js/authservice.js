@@ -115,6 +115,7 @@ const AuthService = {
       const authData = await authResponse.json();
       const userId = authData.user.id;
       const accessToken = authData.access_token;
+      const refreshToken = authData.refresh_token;
 
       console.log('[AuthService] ✅ Autenticación exitosa, userId:', userId);
 
@@ -157,7 +158,14 @@ const AuthService = {
         email: profileData.email,
         role: profileData.role,
         nombre: profileData.nombre,
-        puntos: profileData.puntos || 0
+        puntos: profileData.puntos || 0,
+        session: {
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          user: {
+            id: userId
+          }
+        }
       };
 
       // Paso 3: Si es tienda, cargar datos de la tienda desde tabla stores
@@ -528,7 +536,7 @@ const AuthService = {
 
       console.log('[AuthService] 💾 Intentando validar credenciales inmediatamente...');
       
-      // Intentar login inmediato para verificar si funciona
+      // Intentar login inmediato para obtener token y verificar si funciona
       const testAuthResponse = await fetch(
         `${config.url}/auth/v1/token?grant_type=password`,
         {
@@ -546,12 +554,18 @@ const AuthService = {
 
       console.log('[AuthService] 📦 Test auth response status:', testAuthResponse.status);
 
+      let accessToken = null;
+      let refreshToken = null;
+
       if (!testAuthResponse.ok) {
         const errorData = await testAuthResponse.json().catch(() => ({}));
         console.warn('[AuthService] ⚠️ Login inmediato falló:', errorData);
         console.warn('[AuthService] Esto puede indicar que el email requiere confirmación o hay otro problema.');
       } else {
-        console.log('[AuthService] ✅ Login inmediato funcionó correctamente');
+        const testAuthData = await testAuthResponse.json();
+        accessToken = testAuthData.access_token;
+        refreshToken = testAuthData.refresh_token;
+        console.log('[AuthService] ✅ Login inmediato funcionó correctamente, token obtenido');
       }
 
       // Guardar credenciales para respaldo local (solo para debugging)
@@ -560,6 +574,19 @@ const AuthService = {
       this.guardarUsuarios(usuarios);
 
       console.log('[AuthService] 💾 Guardando usuarioActivo en localStorage...');
+      
+      // Incluir session con token si está disponible
+      if (accessToken) {
+        userFinal.session = {
+          access_token: accessToken,
+          refresh_token: refreshToken,
+          user: {
+            id: userId
+          }
+        };
+        console.log('[AuthService] ✅ Token incluido en sesión');
+      }
+      
       StorageService.set('usuarioActivo', userFinal, 24 * 60 * 60 * 1000);
 
       console.log('[AuthService] ✅✅✅ Usuario registrado exitosamente:', email);
@@ -672,6 +699,10 @@ const AuthService = {
     const index = usuarios.findIndex(u => u.email === usuarioActualizado.email);
     
     if (index !== -1) {
+      // Preservar la sesión si no viene en el objeto actualizado
+      if (!usuarioActualizado.session && usuarios[index].session) {
+        usuarioActualizado.session = usuarios[index].session;
+      }
       usuarios[index] = usuarioActualizado;
       this.guardarUsuarios(usuarios);
       this.guardarUsuarioActivo(usuarioActualizado);

@@ -913,91 +913,187 @@ async function mostrarProductosTienda(tiendaEmail) {
   if (typeof mostrarHistorialTienda === 'function') mostrarHistorialTienda(tiendaEmail);
 }
 
-// Mostrar historial de canjes filtrado por tienda (agrega cliente y ordena por entrada reciente)
-function mostrarHistorialTienda(tiendaEmail) {
+// Mostrar historial de canjes filtrado por tienda (carga desde Supabase)
+async function mostrarHistorialTienda(tiendaEmail) {
   const lista = document.getElementById('historialCanjesTienda');
   if (!lista) return;
 
-  lista.innerHTML = '';
+  lista.innerHTML = '<li style="text-align: center; color: #999;">Cargando historial...</li>';
 
-  const usuarios = AuthService.obtenerUsuarios();
-  const items = [];
+  try {
+    const config = window._SUPABASE_CONFIG;
+    if (!config) {
+      lista.innerHTML = '<li style="text-align: center; color: #999;">Error: Configuración no disponible</li>';
+      return;
+    }
 
-  usuarios.filter(u => u.role === 'cliente').forEach(cliente => {
-    const hist = cliente.historial || [];
-    // recorrer del más reciente al más antiguo por cliente
-    for (let i = hist.length - 1; i >= 0; i--) {
-      const entry = hist[i];
-      if (entry && entry.tienda === tiendaEmail) {
-        items.push({
-          producto: entry.producto,
-          costo: entry.costo,
-          fecha: entry.fecha,
-          fechaHora: entry.fechaHora || null,
-          cliente: cliente.email,
-          tienda: entry.tienda
+    // Obtener tienda_id de la tienda actual
+    const tiendaActual = AuthService.obtenerUsuarioActivo();
+    if (!tiendaActual || !tiendaActual.tienda) {
+      lista.innerHTML = '<li style="text-align: center; color: #999;">Error: No hay datos de tienda</li>';
+      return;
+    }
+
+    const tiendaId = tiendaActual.tienda.id;
+    
+    // Obtener productos de la tienda
+    const productsUrl = new URL(`${config.url}/rest/v1/products`);
+    productsUrl.searchParams.append('tienda_id', `eq.${tiendaId}`);
+    productsUrl.searchParams.append('select', 'id,nombre');
+
+    const productsResponse = await fetch(productsUrl.toString(), {
+      headers: {
+        'apikey': config.anonKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!productsResponse.ok) {
+      console.warn('[App] Error cargando productos:', await productsResponse.text());
+      lista.innerHTML = '<li style="text-align: center; color: #999;">Error al cargar historial</li>';
+      return;
+    }
+
+    const productos = await productsResponse.json();
+    
+    if (!productos || productos.length === 0) {
+      lista.innerHTML = '<li style="text-align: center; color: #999;">Aún no hay canjes registrados en esta tienda</li>';
+      return;
+    }
+
+    const productIds = productos.map(p => p.id);
+    const productMap = {};
+    productos.forEach(p => {
+      productMap[p.id] = p.nombre;
+    });
+    
+    console.log('[App] Product IDs de la tienda:', productIds);
+    console.log('[App] Product Map:', productMap);
+
+    // Obtener todas las redemptions (sin filtro de producto primero)
+    const redemUrl = new URL(`${config.url}/rest/v1/redemptions`);
+    redemUrl.searchParams.append('select', '*');
+    redemUrl.searchParams.append('order', 'creado_at.desc');
+    redemUrl.searchParams.append('limit', '500');
+
+    const redemResponse = await fetch(redemUrl.toString(), {
+      headers: {
+        'apikey': config.anonKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!redemResponse.ok) {
+      console.warn('[App] Error cargando redemptions:', await redemResponse.text());
+      lista.innerHTML = '<li style="text-align: center; color: #999;">Error al cargar historial</li>';
+      return;
+    }
+
+    const allRedemptions = await redemResponse.json();
+    console.log('[App] Redemptions cargados:', allRedemptions.length);
+    
+    if (allRedemptions.length > 0) {
+      console.log('[App] Primera redemption structure:', allRedemptions[0]);
+      console.log('[App] Redemptions keys:', Object.keys(allRedemptions[0]));
+    }
+
+    // Obtener todos los perfiles para mapear perfil_id a email
+    const profilesUrl = new URL(`${config.url}/rest/v1/profiles`);
+    profilesUrl.searchParams.append('select', 'id,email');
+
+    const profilesResponse = await fetch(profilesUrl.toString(), {
+      headers: {
+        'apikey': config.anonKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const profileMap = {};
+    if (profilesResponse.ok) {
+      const profiles = await profilesResponse.json();
+      profiles.forEach(p => {
+        profileMap[p.id] = p.email;
+      });
+    }
+
+    // Filtrar redemptions por productos de esta tienda
+    const itemsFromSupabase = [];
+    
+    for (const r of allRedemptions) {
+      // Verificar si el producto_id está en la lista de productos de esta tienda
+      if (productIds.includes(r.producto_id)) {
+        itemsFromSupabase.push({
+          producto: productMap[r.producto_id] || 'Producto desconocido',
+          costo: r.puntos_usados,
+          fecha: new Date(r.creado_at).toLocaleDateString(),
+          fechaHora: r.creado_at,
+          cliente: profileMap[r.perfil_id] || 'Cliente desconocido',
+          tienda: tiendaEmail
         });
       }
     }
-  });
+    
+    console.log('[App] Items filtrados de Supabase:', itemsFromSupabase.length);
+    console.log('[App] Redemptions producto_ids:', allRedemptions.slice(0, 5).map(r => r.producto_id));
 
-  // Apply filters from the UI
-  const filtros = {
-    q: document.getElementById('filtroBusqueda')?.value.trim() || '',
-    desde: document.getElementById('filtroDesde')?.value || '',
-    hasta: document.getElementById('filtroHasta')?.value || ''
-  };
+    // Apply filters from the UI
+    const filtros = {
+      q: document.getElementById('filtroBusqueda')?.value.trim() || '',
+      desde: document.getElementById('filtroDesde')?.value || '',
+      hasta: document.getElementById('filtroHasta')?.value || ''
+    };
 
-  const itemsFiltrados = items.filter(it => {
-    // Search filter (producto or cliente)
-    const q = filtros.q.toLowerCase();
-    if (q) {
-      const matches = (it.producto || '').toLowerCase().includes(q) || (it.cliente || '').toLowerCase().includes(q);
-      if (!matches) return false;
-    }
-
-    // Date range filter using fechaHora (ISO) if available, otherwise fall back to fecha
-    if (filtros.desde || filtros.hasta) {
-      const iso = it.fechaHora || null;
-      // If there's no ISO timestamp, skip date filtering for that entry (or try to parse 'fecha')
-      if (!iso) return false;
-
-      const entryDate = new Date(iso);
-      if (isNaN(entryDate)) return false;
-
-      if (filtros.desde) {
-        const desdeDate = new Date(filtros.desde + 'T00:00:00');
-        if (entryDate < desdeDate) return false;
+    const itemsFiltrados = itemsFromSupabase.filter(it => {
+      // Search filter (producto or cliente)
+      const q = filtros.q.toLowerCase();
+      if (q) {
+        const matches = (it.producto || '').toLowerCase().includes(q) || (it.cliente || '').toLowerCase().includes(q);
+        if (!matches) return false;
       }
 
-      if (filtros.hasta) {
-        const hastaDate = new Date(filtros.hasta + 'T23:59:59');
-        if (entryDate > hastaDate) return false;
+      // Date range filter
+      if (filtros.desde || filtros.hasta) {
+        const entryDate = new Date(it.fechaHora);
+        if (isNaN(entryDate)) return false;
+
+        if (filtros.desde) {
+          const desdeDate = new Date(filtros.desde + 'T00:00:00');
+          if (entryDate < desdeDate) return false;
+        }
+
+        if (filtros.hasta) {
+          const hastaDate = new Date(filtros.hasta + 'T23:59:59');
+          if (entryDate > hastaDate) return false;
+        }
       }
+
+      return true;
+    });
+
+    if (itemsFiltrados.length === 0) {
+      lista.innerHTML = `
+        <li style='text-align: center; color: #999; padding: 20px;'>
+          <span style='font-size: 1.6em;'>🕘</span><br>
+          Aún no hay canjes registrados en esta tienda
+        </li>
+      `;
+      return;
     }
 
-    return true;
-  });
+    itemsFiltrados.forEach(it => {
+      const li = document.createElement('li');
+      const display = it.fechaHora ? (isNaN(new Date(it.fechaHora)) ? (it.fecha || '') : new Date(it.fechaHora).toLocaleString()) : (it.fecha || '');
+      li.innerHTML = `
+        <strong>${it.producto}</strong>
+        <div class="meta">${it.costo} pts • cliente: <strong>${it.cliente}</strong> • ${display}</div>
+      `;
+      lista.appendChild(li);
+    });
 
-  if (itemsFiltrados.length === 0) {
-    lista.innerHTML = `
-      <li style='text-align: center; color: #999; padding: 20px;'>
-        <span style='font-size: 1.6em;'>🕘</span><br>
-        Aún no hay canjes registrados en esta tienda
-      </li>
-    `;
-    return;
+  } catch (e) {
+    console.error('[App] Error en mostrarHistorialTienda:', e);
+    lista.innerHTML = '<li style="text-align: center; color: #999;">Error al cargar historial</li>';
   }
-
-  itemsFiltrados.forEach(it => {
-    const li = document.createElement('li');
-    const display = it.fechaHora ? (isNaN(new Date(it.fechaHora)) ? (it.fecha || '') : new Date(it.fechaHora).toLocaleString()) : (it.fecha || '');
-    li.innerHTML = `
-      <strong>${it.producto}</strong>
-      <div class="meta">${it.costo} pts • cliente: <strong>${it.cliente}</strong> • ${display}</div>
-    `;
-    lista.appendChild(li);
-  });
 }
 
 // Return the list of historial items (unfiltered) for a tienda
