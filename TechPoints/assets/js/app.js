@@ -1139,45 +1139,57 @@ function configurarHistorialEventos(tiendaEmail) {
 // Export the currently filtered historial as CSV
 function exportHistorialCSV(tiendaEmail) {
   try {
-    const allItems = obtenerHistorialParaTienda(tiendaEmail);
-    const q = document.getElementById('filtroBusqueda')?.value.trim().toLowerCase() || '';
-    const desde = document.getElementById('filtroDesde')?.value || '';
-    const hasta = document.getElementById('filtroHasta')?.value || '';
+    // Obtener los datos del DOM (de la lista mostrada)
+    const lista = document.getElementById('historialCanjesTienda');
+    if (!lista) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('No se encontró la lista de historial', 'error');
+      return;
+    }
 
-    const filtered = allItems.filter(it => {
-      if (q) {
-        const matches = (it.producto || '').toLowerCase().includes(q) || (it.cliente || '').toLowerCase().includes(q);
-        if (!matches) return false;
+    const items = [];
+    const lis = lista.querySelectorAll('li:not(:has(.meta))');
+    
+    // Si hay un mensaje de "no hay registros", entonces items está vacío
+    if (lis.length === 0 || (lis.length === 1 && lis[0].textContent.includes('Aún no hay canjes'))) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('No hay registros que exportar con los filtros actuales', 'warning');
+      return;
+    }
+
+    // Extraer datos de cada <li>
+    lista.querySelectorAll('li:not(:has(span))').forEach(li => {
+      const strong = li.querySelector('strong');
+      const meta = li.querySelector('.meta');
+      
+      if (strong && meta) {
+        const producto = strong.textContent.trim();
+        const metaText = meta.textContent;
+        
+        // Parsear: "1200 pts • cliente: ana@mail.com • 1/9/2026, 6:02:18 AM"
+        const ptsMatch = metaText.match(/(\d+)\s*pts/);
+        const clienteMatch = metaText.match(/cliente:\s*([^\s•]+)/);
+        const dateMatch = metaText.match(/•\s*(.+)$/);
+        
+        items.push({
+          producto: producto,
+          costo: ptsMatch ? ptsMatch[1] : '',
+          cliente: clienteMatch ? clienteMatch[1] : '',
+          fecha: dateMatch ? dateMatch[1].trim() : '',
+          tienda: tiendaEmail
+        });
       }
-      if (desde || hasta) {
-        if (!it.fechaHora) return false;
-        const entryDate = new Date(it.fechaHora);
-        if (isNaN(entryDate)) return false;
-        if (desde) {
-          const desdeDate = new Date(desde + 'T00:00:00');
-          if (entryDate < desdeDate) return false;
-        }
-        if (hasta) {
-          const hastaDate = new Date(hasta + 'T23:59:59');
-          if (entryDate > hastaDate) return false;
-        }
-      }
-      return true;
     });
 
-    if (filtered.length === 0) {
+    if (items.length === 0) {
       if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('No hay registros que exportar con los filtros actuales', 'warning');
       return;
     }
 
     // Build CSV content
-    const headers = ['fechaHora','fechaLocal','producto','costo','cliente','tienda'];
+    const headers = ['Producto', 'Puntos', 'Cliente', 'Fecha', 'Tienda'];
     const rows = [headers.join(',')];
-    filtered.forEach(it => {
-      const fechaISO = it.fechaHora || '';
-      const fechaLocal = it.fechaHora ? (isNaN(new Date(it.fechaHora)) ? (it.fecha || '') : new Date(it.fechaHora).toLocaleString()) : (it.fecha || '');
+    items.forEach(it => {
       const safe = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-      rows.push([safe(fechaISO), safe(fechaLocal), safe(it.producto), safe(it.costo), safe(it.cliente), safe(it.tienda)].join(','));
+      rows.push([safe(it.producto), safe(it.costo), safe(it.cliente), safe(it.fecha), safe(it.tienda)].join(','));
     });
 
     const csvContent = rows.join('\r\n');
