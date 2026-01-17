@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>Zona Tienda</title>
   <link rel="stylesheet" href="../assets/css/style.css">
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Supabase DEBE cargarse primero (sin defer para inicialización inmediata) -->
   <script src="../assets/vendor/supabase.min.js"></script>
   <script src="../assets/js/supabaseClient.js"></script>
@@ -72,15 +74,17 @@
               <input type="text" id="nombreProd" required>
             </div>
             <div class="form-col">
-              <label for="costoProd">Costo en puntos:</label>
-              <input type="number" id="costoProd" required min="1">
+              <label for="precioDolarProd">Precio en dólares (USD):</label>
+              <input type="number" id="precioDolarProd" step="0.01" min="0.01" required>
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-col">
-              <label for="precioDolarProd">Precio en dólares:</label>
-              <input type="number" id="precioDolarProd" step="0.01" min="0">
+              <label>Costo en puntos (calculado automáticamente):</label>
+              <div id="costoPuntosPreview" style="padding: 10px; background-color: #f0f0f0; border-radius: 6px; border: 1px solid #d0d0d0; text-align: center; font-weight: bold; color: #333;">
+                0 puntos
+              </div>
             </div>
             <div class="form-col">
               <label for="stockProd">Stock disponible:</label>
@@ -89,6 +93,62 @@
           </div>
 
           <div class="form-row">
+            <div class="form-col">
+              <label for="categoriaProd">Categoría:</label>
+              <select id="categoriaProd" required>
+                <option value="">-- Selecciona una categoría --</option>
+                <optgroup label="Hardware (Componentes Internos)">
+                  <option value="Procesadores (CPU)">Procesadores (CPU)</option>
+                  <option value="Placas Madre">Placas Madre</option>
+                  <option value="Memoria RAM">Memoria RAM</option>
+                  <option value="Tarjetas Gráficas (GPU)">Tarjetas Gráficas (GPU)</option>
+                  <option value="Almacenamiento (SSD/HDD)">Almacenamiento (SSD/HDD)</option>
+                  <option value="Fuentes de Poder (PSU)">Fuentes de Poder (PSU)</option>
+                  <option value="Tarjetas de Sonido/Red">Tarjetas de Sonido/Red</option>
+                  <option value="Gabinetes">Gabinetes (Cajas)</option>
+                  <option value="Otros - Hardware Internos">Otros - Hardware Internos</option>
+                </optgroup>
+                <optgroup label="Periféricos (Entrada)">
+                  <option value="Teclados">Teclados</option>
+                  <option value="Ratones (Mouse)">Ratones (Mouse)</option>
+                  <option value="Cámaras Web">Cámaras Web</option>
+                  <option value="Micrófonos">Micrófonos</option>
+                  <option value="Auriculares/Audífonos">Auriculares/Audífonos</option>
+                  <option value="Otros - Periféricos Entrada">Otros - Periféricos Entrada</option>
+                </optgroup>
+                <optgroup label="Periféricos (Salida)">
+                  <option value="Monitores/Pantallas">Monitores/Pantallas</option>
+                  <option value="Impresoras">Impresoras</option>
+                  <option value="Altavoces/Parlantes">Altavoces/Parlantes</option>
+                  <option value="Otros - Periféricos Salida">Otros - Periféricos Salida</option>
+                </optgroup>
+                <optgroup label="Tipos de Computadoras">
+                  <option value="Computadoras Escritorio">Computadoras Escritorio</option>
+                  <option value="Laptops/Notebooks">Laptops/Notebooks</option>
+                  <option value="Todo en Uno (All-in-One)">Todo en Uno (All-in-One)</option>
+                  <option value="Mini PCs y Barebones">Mini PCs y Barebones</option>
+                  <option value="Gaming/Workstations">Gaming/Workstations (Alto rendimiento)</option>
+                  <option value="Otros - Tipos de Computadoras">Otros - Tipos de Computadoras</option>
+                </optgroup>
+                <optgroup label="Software y Sistemas">
+                  <option value="Sistemas Operativos">Sistemas Operativos</option>
+                  <option value="Software de Productividad">Software de Productividad</option>
+                  <option value="Otros - Software">Otros - Software</option>
+                </optgroup>
+                <optgroup label="Accesorios y Conectividad">
+                  <option value="Cables y Adaptadores">Cables y Adaptadores</option>
+                  <option value="Soportes y Bases">Soportes y Bases</option>
+                  <option value="Componentes de Red">Componentes de Red (Router, Switch, etc.)</option>
+                  <option value="UPS y Protectores">UPS y Protectores de Sobretensión</option>
+                  <option value="Otros - Accesorios">Otros - Accesorios</option>
+                </optgroup>
+                <optgroup label="Mantenimiento">
+                  <option value="Kits de Limpieza">Kits de Limpieza</option>
+                  <option value="Ventiladores y Refrigeración">Ventiladores y Refrigeración</option>
+                  <option value="Otros - Mantenimiento">Otros - Mantenimiento</option>
+                </optgroup>
+              </select>
+            </div>
             <div class="form-col">
               <label for="imagenProdFile">Imagen del producto:</label>
               <input type="file" id="imagenProdFile" accept="image/*">
@@ -129,6 +189,81 @@
         </div>
         <div class="historial-tienda-list">
           <ul id="historialCanjesTienda"></ul>
+        </div>
+      </section>
+
+      <!-- Reportes y Estadísticas -->
+      <section class="tienda-section">
+        <h2>📊 Reportes y Estadísticas</h2>
+        
+        <!-- Controles de período -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;">
+          <label for="reportePeriodo">Período:</label>
+          <select id="reportePeriodo" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d0d0; font-size: 0.95em;">
+            <option value="7">Últimos 7 días</option>
+            <option value="30">Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+            <option value="365">Último año</option>
+            <option value="0">Todo el tiempo</option>
+          </select>
+          <button id="btnActualizarReportes" class="btn-secondary" type="button">Actualizar</button>
+        </div>
+
+        <!-- Tarjetas de estadísticas clave -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <div class="stats-card">
+            <div class="stats-value" id="totalCanjes">0</div>
+            <div class="stats-label">Total de Canjes</div>
+          </div>
+          <div class="stats-card">
+            <div class="stats-value" id="totalPuntosDistribuidos">0</div>
+            <div class="stats-label">Puntos Distribuidos</div>
+          </div>
+          <div class="stats-card">
+            <div class="stats-value" id="totalClientes">0</div>
+            <div class="stats-label">Clientes Activos</div>
+          </div>
+          <div class="stats-card">
+            <div class="stats-value" id="productoMasVendido">-</div>
+            <div class="stats-label">Producto Más Vendido</div>
+          </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 24px; margin-bottom: 24px;">
+          <!-- Gráfico de canjes por producto -->
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: relative; height: 400px;">
+            <h3 style="margin-top: 0; font-size: 1.1em;">Canjes por Producto</h3>
+            <div style="position: relative; width: 100%; height: 320px;">
+              <canvas id="chartCanjePorProducto"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico de tendencia temporal -->
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: relative; height: 400px;">
+            <h3 style="margin-top: 0; font-size: 1.1em;">Tendencia de Canjes</h3>
+            <div style="position: relative; width: 100%; height: 320px;">
+              <canvas id="chartTendenciaCanjes"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de productos con estadísticas -->
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow-x: auto;">
+          <h3 style="margin-top: 0; font-size: 1.1em;">Estadísticas por Producto</h3>
+          <table id="tablaEstadisticasProductos" style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+            <thead>
+              <tr style="background: #e8e8e8; border-bottom: 2px solid #d0d0d0;">
+                <th style="padding: 12px; text-align: left;">Producto</th>
+                <th style="padding: 12px; text-align: center;">Canjes</th>
+                <th style="padding: 12px; text-align: center;">Puntos Usados</th>
+                <th style="padding: 12px; text-align: center;">Promedio/Canje</th>
+              </tr>
+            </thead>
+            <tbody id="cuerpoTablaEstadisticas">
+              <tr><td colspan="4" style="padding: 20px; text-align: center; color: #999;">Cargando estadísticas...</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </main>

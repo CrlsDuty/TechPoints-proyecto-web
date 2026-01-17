@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo de Tiendas - TechPoints</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <!-- Supabase DEBE cargarse primero -->
+  <script src="../assets/vendor/supabase.min.js"></script>
+  <script src="../assets/js/supabaseClient.js"></script>
+  <!-- Scripts con defer -->
+  <script defer src="../assets/js/utils.js"></script>
+  <script defer src="../assets/js/services/StorageService.js"></script>
+  <script defer src="../assets/js/authservice.js"></script>
+  <script defer src="../assets/js/tiendas-catalog.js"></script>
+</head>
+<body>
+  <div class="catalog-container">
+    <!-- Header -->
+    <header class="catalog-header">
+      <div class="catalog-header-content">
+        <h1>🏪 Catálogo de Tiendas</h1>
+        <div class="header-actions">
+          <div id="puntosMiembro" class="mis-puntos">
+            <span id="puntosMiembroValor">0</span> pts
+          </div>
+          <button id="btnCarrito" class="btn-carrito">
+            🛒 Carrito (<span id="cartCount">0</span>)
+          </button>
+          <button id="btnCerrarSesion" class="btn-secondary">Cerrar sesión</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="catalog-main">
+      <!-- Filtros de búsqueda -->
+      <aside class="catalog-sidebar">
+        <h2>Filtros</h2>
+        <div class="filter-group">
+          <label for="filtroTienda">Buscar tienda:</label>
+          <input type="search" id="filtroTienda" placeholder="Nombre de tienda..." style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #d0d0d0;">
+        </div>
+        <div class="filter-group">
+          <label for="filtroProducto">Buscar producto:</label>
+          <input type="search" id="filtroProducto" placeholder="Nombre del producto..." style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #d0d0d0;">
+        </div>
+        <div class="filter-group">
+          <label for="filtroPuntos">Máximo de puntos:</label>
+          <input type="number" id="filtroPuntos" placeholder="ej: 500" min="0" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #d0d0d0;">
+        </div>
+        <button id="btnLimpiarFiltros" class="btn-secondary" style="width: 100%; margin-top: 12px;">🔄 Limpiar filtros</button>
+      </aside>
+
+      <!-- Tiendas y Productos -->
+      <section class="catalog-content">
+        <div id="tiendasList" class="tiendas-grid">
+          <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">
+            <p>Cargando tiendas...</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal del Carrito -->
+  <div id="modalCarrito" class="modal" aria-hidden="true">
+    <div class="modal-content modal-carrito">
+      <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      <div class="modal-header">
+        <h2>🛒 Mi Carrito</h2>
+      </div>
+      <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
+        <table id="tablaCarrito" style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+          <thead>
+            <tr style="background: #e8e8e8; border-bottom: 2px solid #d0d0d0; position: sticky; top: 0;">
+              <th style="padding: 12px; text-align: left;">Producto</th>
+              <th style="padding: 12px; text-align: center;">Tienda</th>
+              <th style="padding: 12px; text-align: center;">Puntos</th>
+              <th style="padding: 12px; text-align: center;">Cantidad</th>
+              <th style="padding: 12px; text-align: center;">Total</th>
+              <th style="padding: 12px; text-align: center;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpoTablaCarrito">
+            <tr id="carritoVacio"><td colspan="6" style="padding: 20px; text-align: center; color: #999;">El carrito está vacío</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer" style="flex-direction: column; gap: 12px;">
+        <div style="background: #f0f0f0; padding: 16px; border-radius: 8px; text-align: right;">
+          <div style="margin-bottom: 8px; font-size: 0.95em; color: #666;">
+            Total de puntos a usar: <strong id="totalCarrito">0</strong>
+          </div>
+          <div style="font-size: 0.9em; color: #999;">
+            Puntos disponibles: <strong id="puntosDisponibles">0</strong>
+          </div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+          <button type="button" class="btn-secondary" id="btnCancelarCarrito">Cerrar</button>
+          <button type="button" class="btn-primary" id="btnRealizarCompra" style="flex: 1;">Realizar Compra</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmación de Compra -->
+  <div id="modalConfirmacion" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button type="button" class="modal-close" aria-label="Cerrar">&times;</button>
+      <div class="modal-header">
+        <h2>✅ Confirmar Compra</h2>
+      </div>
+      <div class="modal-body" style="display: block;">
+        <p>¿Estás seguro de que deseas canjear <strong id="confirmPuntos">0</strong> puntos por los productos seleccionados?</p>
+        <div style="background: #f9f9f9; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <h4>Resumen:</h4>
+          <ul id="confirmDetalle" style="list-style: none; padding: 0; margin: 0;">
+          </ul>
+        </div>
+        <p style="font-size: 0.9em; color: #666;">Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="btnCancelarConfirm">Cancelar</button>
+        <button type="button" class="btn-primary" id="btnConfirmarCompra" style="background: #10b981;">Confirmar Compra</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .catalog-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #f5f5f5;
+    }
+
+    .catalog-header {
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .catalog-header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .catalog-header h1 {
+      margin: 0;
+      font-size: 1.8em;
+      color: #1a1a1a;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .mis-puntos {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95em;
+    }
+
+    .btn-carrito {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-carrito:hover {
+      background: #059669;
+    }
+
+    .catalog-main {
+      display: flex;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      gap: 20px;
+      padding: 20px;
+      flex: 1;
+    }
+
+    .catalog-sidebar {
+      width: 250px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      height: fit-content;
+      position: sticky;
+      top: 20px;
+    }
+
+    .catalog-sidebar h2 {
+      font-size: 1.1em;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+
+    .filter-group {
+      margin-bottom: 16px;
+    }
+
+    .filter-group label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 6px;
+      font-size: 0.9em;
+    }
+
+    .catalog-content {
+      flex: 1;
+    }
+
+    .tiendas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .tienda-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: box-shadow 0.3s, transform 0.3s;
+    }
+
+    .tienda-card:hover {
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      transform: translateY(-2px);
+    }
+
+    .tienda-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px;
+    }
+
+    .tienda-nombre {
+      font-size: 1.2em;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .tienda-productos {
+      padding: 16px;
+    }
+
+    .producto-item {
+      padding: 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+      transition: background 0.2s;
+    }
+
+    .producto-item:hover {
+      background: #f9f9f9;
+    }
+
+    .producto-info {
+      flex: 1;
+    }
+
+    .producto-nombre {
+      font-weight: 600;
+      font-size: 0.95em;
+      margin: 0 0 4px 0;
+    }
+
+    .producto-puntos {
+      color: #667eea;
+      font-weight: 600;
+      font-size: 0.9em;
+    }
+
+    .producto-descripcion {
+      font-size: 0.85em;
+      color: #666;
+      margin: 4px 0 0 0;
+      max-height: 40px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .producto-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .cantidad-input {
+      width: 50px;
+      padding: 4px 8px;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 0.9em;
+    }
+
+    .btn-agregar {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: background 0.2s;
+    }
+
+    .btn-agregar:hover {
+      background: #059669;
+    }
+
+    .modal-carrito {
+      max-width: 900px;
+    }
+
+    @media (max-width: 768px) {
+      .catalog-main {
+        flex-direction: column;
+      }
+
+      .catalog-sidebar {
+        width: 100%;
+        position: static;
+      }
+
+      .tiendas-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .catalog-header-content {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .header-actions {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</body>
+</html>

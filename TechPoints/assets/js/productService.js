@@ -61,7 +61,7 @@ const ProductService = {
   },
 
   // Agregar nuevo producto
-  async agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagenFile = null, stock = 0) {
+  async agregarProducto(tiendaEmail, nombre, costo, precioDolar = null, descripcion = null, imagenFile = null, stock = 0, categoria = null) {
     if (this.isSupabaseEnabled()) {
       try {
         console.log('[ProductService] Intentando agregar producto a Supabase...');
@@ -133,6 +133,7 @@ const ProductService = {
           tienda_id: stores.id,
           nombre: nombre.trim(),
           descripcion: descripcion ? descripcion.trim() : null,
+          categoria: categoria ? categoria.trim() : null,
           costo_puntos: parseInt(costo),
           precio_dolar: precioDolar ? parseFloat(precioDolar) : null,
           imagen_url: imagenUrl, // URL de Storage, no dataURL
@@ -197,6 +198,7 @@ const ProductService = {
         costo: parseInt(costo),
         precioDolar: precioDolar ? parseFloat(precioDolar) : null,
         descripcion: descripcion ? descripcion.trim() : null,
+        categoria: categoria ? categoria.trim() : null,
         imagen: imagen ? imagen.trim() : null,
         stock: parseInt(stock) || 0
       };

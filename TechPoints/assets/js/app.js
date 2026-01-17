@@ -567,6 +567,7 @@ function inicializarTienda(usuarioActivo) {
   configurarFormularioProductos(usuarioActivo);
   mostrarHistorialTienda(usuarioActivo.email);
   configurarHistorialEventos(usuarioActivo.email);
+  inicializarReportes(usuarioActivo.email);
 }
 
 function mostrarInfoTienda(usuarioActivo) {
@@ -792,16 +793,43 @@ function configurarFormularioProductos(usuarioActivo) {
     imagenProdClear.style.display = 'none';
   });
 
+  // Tasa de conversión: 1 USD = 100 puntos
+  const TASA_CONVERSION = 100;
+  const precioDolarInput = document.getElementById('precioDolarProd');
+  const costoPuntosPreview = document.getElementById('costoPuntosPreview');
+
+  // Actualizar vista previa de puntos en tiempo real
+  precioDolarInput?.addEventListener('input', () => {
+    const precioDolar = parseFloat(precioDolarInput.value) || 0;
+    const puntos = Math.round(precioDolar * TASA_CONVERSION);
+    if (costoPuntosPreview) {
+      costoPuntosPreview.textContent = puntos.toLocaleString() + ' puntos';
+    }
+  });
+
   formProducto.addEventListener("submit", e => {
     e.preventDefault();
     
     const nombre = document.getElementById("nombreProd").value.trim();
-    const costo = document.getElementById("costoProd").value.trim();
-    const precioDolar = document.getElementById("precioDolarProd")?.value.trim() || null;
+    const precioDolar = parseFloat(document.getElementById("precioDolarProd").value) || 0;
+    const costo = Math.round(precioDolar * TASA_CONVERSION); // Calcular automáticamente
+    const categoria = document.getElementById("categoriaProd")?.value.trim() || null;
     const descripcion = document.getElementById("descripcionProd")?.value.trim() || null;
     const imagen = imagenProdFileSelected || null; // Pasar el File, no dataURL
     const stock = document.getElementById("stockProd")?.value.trim() || "0";
     const submitBtn = formProducto.querySelector('button[type="submit"]');
+
+    // Validar que el precio no esté vacío
+    if (precioDolar <= 0) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('El precio en dólares debe ser mayor a 0', 'warning');
+      return;
+    }
+
+    // Validar que la categoría esté seleccionada
+    if (!categoria) {
+      if (Utils && typeof Utils.mostrarToast === 'function') Utils.mostrarToast('Debe seleccionar una categoría', 'warning');
+      return;
+    }
 
     (async () => {
       submitBtn.disabled = true;
@@ -815,7 +843,8 @@ function configurarFormularioProductos(usuarioActivo) {
           precioDolar, 
           descripcion, 
           imagen, // Ahora es File o null
-          stock
+          stock,
+          categoria
         );
 
         if (resultado.success) {
@@ -1484,5 +1513,357 @@ if (window.EventBus) {
     } catch (err) {
       console.warn('Error registrando transaccion logout:', err);
     }
+  });
+}
+
+// ============================================================================
+// FUNCIONES DE REPORTES Y ESTADÍSTICAS
+// ============================================================================
+
+/**
+ * Inicializar dashboard de reportes
+ */
+async function inicializarReportes(tiendaEmail) {
+  const btnActualizar = document.getElementById('btnActualizarReportes');
+  if (btnActualizar) {
+    btnActualizar.addEventListener('click', () => actualizarReportes(tiendaEmail));
+  }
+  
+  // Cargar reportes por primera vez
+  await actualizarReportes(tiendaEmail);
+}
+
+/**
+ * Actualizar todos los reportes según período seleccionado
+ */
+async function actualizarReportes(tiendaEmail) {
+  try {
+    const periodoSelect = document.getElementById('reportePeriodo');
+    const dias = parseInt(periodoSelect?.value || '7', 10);
+    
+    console.log('[Reportes] Actualizando con período:', dias, 'días');
+    
+    // Obtener tienda_id
+    const usuarioActivo = AuthService.obtenerUsuarioActivo();
+    if (!usuarioActivo || !usuarioActivo.tienda) {
+      console.error('[Reportes] No hay datos de tienda');
+      return;
+    }
+    
+    const tiendaId = usuarioActivo.tienda.id;
+    
+    // Obtener todos los datos necesarios
+    const config = window._SUPABASE_CONFIG;
+    const datos = await obtenerDatosReportes(tiendaId, dias, config);
+    
+    // Calcular estadísticas
+    const stats = calcularEstadisticas(datos);
+    
+    // Mostrar estadísticas en tarjetas
+    mostrarTarjetasEstadisticas(stats);
+    
+    // Mostrar gráficos
+    mostrarGraficos(stats);
+    
+    // Mostrar tabla de productos
+    mostrarTablaEstadisticas(stats);
+    
+  } catch (err) {
+    console.error('[Reportes] Error actualizando reportes:', err);
+  }
+}
+
+/**
+ * Obtener datos de Supabase para el período seleccionado
+ */
+async function obtenerDatosReportes(tiendaId, diasAtras, config) {
+  try {
+    const redemUrl = new URL(`${config.url}/rest/v1/redemptions`);
+    redemUrl.searchParams.append('select', '*');
+    redemUrl.searchParams.append('limit', '1000');
+    
+    const response = await fetch(redemUrl.toString(), {
+      headers: {
+        'apikey': config.anonKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Error cargando redemptions');
+    }
+    
+    const allRedemptions = await response.json();
+    
+    // Obtener productos de la tienda
+    const productsUrl = new URL(`${config.url}/rest/v1/products`);
+    productsUrl.searchParams.append('tienda_id', `eq.${tiendaId}`);
+    productsUrl.searchParams.append('select', 'id,nombre');
+    
+    const productsResponse = await fetch(productsUrl.toString(), {
+      headers: {
+        'apikey': config.anonKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const productos = await productsResponse.json() || [];
+    const productIds = productos.map(p => p.id);
+    const productMap = {};
+    productos.forEach(p => {
+      productMap[p.id] = p.nombre;
+    });
+    
+    // Filtrar por tienda y período
+    const ahora = new Date();
+    const fechaLimite = new Date(ahora.getTime() - (diasAtras * 24 * 60 * 60 * 1000));
+    
+    const redemptionsFiltered = allRedemptions.filter(r => {
+      if (!productIds.includes(r.producto_id)) return false;
+      
+      if (diasAtras > 0) {
+        const fecha = new Date(r.creado_at);
+        return fecha >= fechaLimite;
+      }
+      return true;
+    });
+    
+    return {
+      redemptions: redemptionsFiltered,
+      productos: productos,
+      productMap: productMap
+    };
+    
+  } catch (err) {
+    console.error('[Reportes] Error obteniendo datos:', err);
+    return { redemptions: [], productos: [], productMap: {} };
+  }
+}
+
+/**
+ * Calcular estadísticas a partir de los datos
+ */
+function calcularEstadisticas(datos) {
+  const { redemptions, productMap } = datos;
+  
+  console.log('[Reportes] Total redemptions filtradas:', redemptions.length);
+  
+  // Estadísticas generales
+  const totalCanjes = redemptions.length;
+  const totalPuntosDistribuidos = redemptions.reduce((sum, r) => sum + (r.puntos_usados || 0), 0);
+  const clientesUnicos = new Set(redemptions.map(r => r.perfil_id)).size;
+  
+  // Agrupar por producto
+  const porProducto = {};
+  redemptions.forEach(r => {
+    if (!porProducto[r.producto_id]) {
+      porProducto[r.producto_id] = {
+        producto: productMap[r.producto_id] || 'Desconocido',
+        canjes: 0,
+        puntos: 0
+      };
+    }
+    porProducto[r.producto_id].canjes += 1;
+    porProducto[r.producto_id].puntos += r.puntos_usados || 0;
+  });
+  
+  // Producto más vendido
+  let productoMasVendido = '-';
+  let maxCanjes = 0;
+  Object.values(porProducto).forEach(p => {
+    if (p.canjes > maxCanjes) {
+      maxCanjes = p.canjes;
+      productoMasVendido = p.producto;
+    }
+  });
+  
+  // Agrupar por día para tendencia
+  const porDia = {};
+  redemptions.forEach(r => {
+    const fecha = new Date(r.creado_at).toISOString().split('T')[0];
+    if (!porDia[fecha]) {
+      porDia[fecha] = 0;
+    }
+    porDia[fecha] += 1;
+  });
+  
+  // Convertir a arrays ordenados
+  const diasOrdenados = Object.keys(porDia).sort();
+  const canjePorDia = diasOrdenados.map(d => ({ fecha: d, canjes: porDia[d] }));
+  
+  // Convertir productos a array y ordenar
+  const productosArray = Object.entries(porProducto).map(([id, data]) => ({
+    id,
+    ...data
+  })).sort((a, b) => b.canjes - a.canjes);
+  
+  console.log('[Reportes] Productos con datos:', productosArray.length);
+  console.log('[Reportes] Días con datos:', canjePorDia.length);
+  
+  return {
+    totalCanjes,
+    totalPuntosDistribuidos,
+    clientesUnicos,
+    productoMasVendido,
+    porProducto: productosArray,
+    canjePorDia,
+    diasOrdenados
+  };
+}
+
+/**
+ * Mostrar tarjetas de estadísticas clave
+ */
+function mostrarTarjetasEstadisticas(stats) {
+  document.getElementById('totalCanjes').textContent = stats.totalCanjes;
+  document.getElementById('totalPuntosDistribuidos').textContent = stats.totalPuntosDistribuidos;
+  document.getElementById('totalClientes').textContent = stats.clientesUnicos;
+  document.getElementById('productoMasVendido').textContent = stats.productoMasVendido;
+}
+
+/**
+ * Mostrar gráficos
+ */
+function mostrarGraficos(stats) {
+  mostrarGraficoProductos(stats);
+  mostrarGraficoTendencia(stats);
+}
+
+/**
+ * Gráfico de barras: canjes por producto
+ */
+function mostrarGraficoProductos(stats) {
+  const ctx = document.getElementById('chartCanjePorProducto')?.getContext('2d');
+  if (!ctx) return;
+  
+  // Destruir gráfico anterior si existe
+  if (window.chartCanjePorProducto && typeof window.chartCanjePorProducto.destroy === 'function') {
+    window.chartCanjePorProducto.destroy();
+  }
+  
+  // Validar que tenemos datos
+  if (!stats.porProducto || stats.porProducto.length === 0) {
+    console.log('[Reportes] No hay datos de productos para mostrar gráfico');
+    return;
+  }
+  
+  const labels = stats.porProducto.slice(0, 10).map(p => p.producto);
+  const data = stats.porProducto.slice(0, 10).map(p => p.canjes);
+  
+  window.chartCanjePorProducto = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Canjes',
+        data: data,
+        backgroundColor: 'rgba(102, 126, 234, 0.7)',
+        borderColor: 'rgba(102, 126, 234, 1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Gráfico de línea: tendencia temporal
+ */
+function mostrarGraficoTendencia(stats) {
+  const ctx = document.getElementById('chartTendenciaCanjes')?.getContext('2d');
+  if (!ctx) return;
+  
+  // Destruir gráfico anterior si existe
+  if (window.chartTendenciaCanjes && typeof window.chartTendenciaCanjes.destroy === 'function') {
+    window.chartTendenciaCanjes.destroy();
+  }
+  
+  // Validar que tenemos datos
+  if (!stats.canjePorDia || stats.canjePorDia.length === 0) {
+    console.log('[Reportes] No hay datos de tendencia para mostrar gráfico');
+    return;
+  }
+  
+  const labels = stats.canjePorDia.map(d => d.fecha);
+  const data = stats.canjePorDia.map(d => d.canjes);
+  
+  window.chartTendenciaCanjes = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Canjes por día',
+        data: data,
+        borderColor: 'rgba(118, 75, 162, 1)',
+        backgroundColor: 'rgba(118, 75, 162, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            boxWidth: 12
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Mostrar tabla de estadísticas por producto
+ */
+function mostrarTablaEstadisticas(stats) {
+  const tbody = document.getElementById('cuerpoTablaEstadisticas');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  
+  if (stats.porProducto.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #999;">Sin datos de canjes en este período</td></tr>';
+    return;
+  }
+  
+  stats.porProducto.forEach(p => {
+    const promedio = Math.round(p.puntos / p.canjes);
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid #e0e0e0';
+    tr.innerHTML = `
+      <td style="padding: 12px;">${p.producto}</td>
+      <td style="padding: 12px; text-align: center;">${p.canjes}</td>
+      <td style="padding: 12px; text-align: center;">${p.puntos}</td>
+      <td style="padding: 12px; text-align: center;">${promedio}</td>
+    `;
+    tbody.appendChild(tr);
   });
 }
