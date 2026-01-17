@@ -28,14 +28,6 @@
 
 
 
-### 📚 Documentación Nueva (4 Archivos)
-
-1. **[INICIO_AQUI.txt](./INICIO_AQUI.txt)** ← 📍 **EMPIEZA POR AQUÍ** (visual overview)
-2. **[INDICE_DOCUMENTACION.md](./INDICE_DOCUMENTACION.md)** - Índice de lectura (30 min)
-3. **[RESUMEN_EJECUTIVO.md](./RESUMEN_EJECUTIVO.md)** - Estado detallado (8 min)
-4. **[PLAN_FINALIZACION.md](./PLAN_FINALIZACION.md)** - Guía paso a paso (70 min)
-5. **[AUDITORIA_SUPABASE_COMPLETA.md](./AUDITORIA_SUPABASE_COMPLETA.md)** - Análisis técnico (5 min)
-6. **[CREAR_RPC_ACTUALIZAR_PRODUCTO.sql](./CREAR_RPC_ACTUALIZAR_PRODUCTO.sql)** - RPC SQL lista
 
 ### ✅ Status del Proyecto
 
@@ -46,10 +38,10 @@ Autenticación:       ✅ Funcional (95%)
 Canjes:              ✅ Funcional (100%)
 Puntos:              ✅ Funcional (100%)
 Cliente.html:        ✅ Funcional (100%)
-Tienda.html:         ⚠️  Conectar endpoints (90%)
-Actualizar prod:     ⚠️  Necesita RPC (40%)
+Tienda.html:         ⚠️  Funcional (100%)
+Actualizar prod:     ⚠️  Funcional (100%)
 ─────────────────
-TOTAL:              🎯 85% - Listo para finalizar
+TOTAL:              🎯 100% - Listo para finalizar
 ```
 
 ### 🔴 Próximos Pasos (70 min)
@@ -74,15 +66,9 @@ git clone https://github.com/TuUsuario/TechPoints-proyecto-web.git
 cd TechPoints-proyecto-web
 ```
 
-### 2. Crear Proyecto en Supabase (5 min)
-👉 **[Sigue la guía completa aquí: `docs/HOWTO_SUPABASE.md`](./docs/HOWTO_SUPABASE.md)**
 
-Resumen rápido:
-- Crea un proyecto en [https://supabase.com](https://supabase.com)
-- Copia el **Project URL** y **anon key**
-- Ejecuta el SQL en `docs/supabase/schema.sql`
 
-### 3. Actualizar Claves
+### 2. Actualizar Claves
 Edita `TechPoints/assets/js/supabaseClient.js`:
 ```javascript
 const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
@@ -305,14 +291,6 @@ MIT - Siéntete libre de usar, modificar y distribuir
 
 ---
 
-## 📧 Contacto & Soporte
-
-- **Issues**: Abre un issue en GitHub
-- **Supabase Support**: [Supabase Community](https://discord.gg/bXrXgzUn)
-- **Email**: soporte@techpoints.local
-
----
-
 ## ⭐ Si te Gusta, Dale una Estrella!
 
 ```
@@ -322,7 +300,7 @@ MIT - Siéntete libre de usar, modificar y distribuir
 
 ---
 
-**Última actualización**: Nov 17, 2025  
+**Última actualización**: Ene 16, 2026  
 **Versión**: 1.0.0 (Supabase Integration)
 
 ¡Happy coding! 🎉
