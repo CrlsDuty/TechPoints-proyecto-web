@@ -1,4 +1,4 @@
-import { obtenerHistorialCanjes } from '../../../shared/supabaseClient'
+import { obtenerHistorialCanjes } from '../utils/supabase'
 
 export const historialService = {
   async cargarHistorialCanjes(usuarioId) {

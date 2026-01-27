@@ -1,5 +1,5 @@
 import React, { createContext, useState, useCallback } from 'react'
-import { obtenerProductos } from '../../../shared/supabaseClient'
+import { obtenerProductos } from '../utils/supabase'
 
 export const ProductosContext = createContext()
 

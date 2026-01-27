@@ -1,9 +1,10 @@
+import React, { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 
 export const Login = () => {
-  const [email, setEmail] = React.useState('')
-  const [password, setPassword] = React.useState('')
-  const [cargando, setCargando] = React.useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [cargando, setCargando] = useState(false)
   const { login } = useAuth()
 
   const handleSubmit = async (e) => {

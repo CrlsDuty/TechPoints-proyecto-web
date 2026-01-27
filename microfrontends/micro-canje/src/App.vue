@@ -9,7 +9,7 @@ import CarritoCanjes from './components/CarritoCanjes.vue'
 
 // Escuchar evento add-to-cart del EventBus
 import { onMounted } from 'vue'
-import eventBus from '../../../shared/eventBus'
+import eventBus from '@shared/eventBus'
 import { useCanjeStore } from './stores/canjeStore'
 
 const store = useCanjeStore()

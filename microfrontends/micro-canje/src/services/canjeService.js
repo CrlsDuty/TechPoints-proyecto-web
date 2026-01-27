@@ -1,5 +1,5 @@
-import { crearCanje } from '../../../shared/supabaseClient'
-import eventBus from '../../../shared/eventBus'
+import { crearCanje } from '../utils/supabase'
+import eventBus from '@shared/eventBus'
 
 export const canjeService = {
   async procesarCanjes(usuarioId, carrito, puntosActuales) {

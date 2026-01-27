@@ -1,5 +1,5 @@
 import React from 'react'
-import eventBus from '../../../shared/eventBus'
+import eventBus from '@shared/eventBus'
 
 const TarjetaProducto = ({ producto }) => {
   const handleAgregarAlCarrito = () => {
