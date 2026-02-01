@@ -1,13 +1,7 @@
-import { useEffect } from 'react'
 import { useProductos } from '../context/ProductosContext'
 
 export const useProductosHook = () => {
   const { productos, cargarProductos } = useProductos()
-
-  useEffect(() => {
-    cargarProductos()
-  }, [])
-
   return {
     productos,
     cargarProductos

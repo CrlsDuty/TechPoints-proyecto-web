@@ -22,7 +22,8 @@ export const AuthProvider = ({ children }) => {
         id: authUser.id,
         email: authUser.email,
         nombre: perfil?.nombre || authUser.email.split('@')[0],
-        puntos: perfil?.puntos || 0
+        puntos: perfil?.puntos || 0,
+        role: perfil?.role || 'cliente'
       })
     } catch (err) {
       console.error('Error estableciendo usuario:', err)

@@ -94,6 +94,22 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
    - **Project URL** → `VITE_SUPABASE_URL`
    - **anon (public)** → `VITE_SUPABASE_ANON_KEY`
 
+**Opcional (shell-app):** para que "Ver Catálogo" abra micro-productos en producción, define la URL del microfrontend:
+```bash
+# shell-app/.env.local
+VITE_MICRO_PRODUCTOS_URL=http://localhost:5175
+# En producción: https://tu-dominio.com/micro-productos
+```
+Si no la defines, el shell usa por defecto `http://localhost:5175` en desarrollo.
+
+**Sesión compartida (iframe):** el shell envía la sesión de Supabase al iframe de micro-productos por `postMessage`, para que no tengas que iniciar sesión otra vez. En **micro-productos** puedes definir el origen del shell (para aceptar solo mensajes de ese origen):
+```bash
+# micro-productos/.env.local (opcional)
+VITE_SHELL_ORIGIN=http://localhost:5173
+# En producción: https://tu-dominio.com
+```
+Si no la defines, se usa por defecto `http://localhost:5173` en desarrollo.
+
 ---
 
 ## 🎮 Paso 4: Ejecutar en Desarrollo
