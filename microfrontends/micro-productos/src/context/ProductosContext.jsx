@@ -36,8 +36,20 @@ export const ProductosProvider = ({ children }) => {
     setProductosFiltrados(filtrados)
   }, [])
 
+  // Usar una ref para manejar AbortController por solicitud
+  const [abortControllerRef] = React.useState({ current: null })
+
   const cargarProductos = useCallback(
     async (filtrosAplicar = filtros) => {
+      // Abortar solicitud anterior si existe
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
+      // Crear nuevo AbortController
+      const ac = new AbortController()
+      abortControllerRef.current = ac
+
       setCargando(true)
       setError(null)
       try {
@@ -50,14 +62,25 @@ export const ProductosProvider = ({ children }) => {
             busqueda: filtrosAplicar.busqueda
           })
         }
-        setProductos(datos)
-        aplicarFiltros(datos, filtrosAplicar)
+
+        // Verificar si la solicitud fue abortada antes de actualizar estado
+        if (!ac.signal.aborted) {
+          setProductos(datos)
+          aplicarFiltros(datos, filtrosAplicar)
+        }
       } catch (err) {
+        // Ignorar errores por abort
+        if (err?.name === 'AbortError' || ac.signal.aborted) {
+          return
+        }
         setError(err?.message || 'Error al cargar productos')
         setProductos([])
         setProductosFiltrados([])
       } finally {
-        setCargando(false)
+        // Solo actualizar si no fue abortada
+        if (!ac.signal.aborted) {
+          setCargando(false)
+        }
       }
     },
     [usuario?.id, usuario?.role, filtros, aplicarFiltros]
@@ -159,9 +182,24 @@ export const ProductosProvider = ({ children }) => {
   }, [])
 
   useEffect(() => {
-    cargarProductos()
-    // Solo recargar cuando cambie el usuario (rol/tienda); filtros se aplican en cliente
-  }, [usuario?.id, usuario?.role])
+    // Solo cargar cuando el usuario cambie (no en cada render)
+    if (usuario?.id) {
+      cargarProductos(filtros)
+    } else {
+      // Si no hay usuario, limpiar productos
+      setProductos([])
+      setProductosFiltrados([])
+    }
+  }, [usuario?.id, usuario?.role]) // Dependencias mínimas para evitar loops
+
+  // Cleanup: Abortar solicitudes al desmontar
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   return (
     <ProductosContext.Provider

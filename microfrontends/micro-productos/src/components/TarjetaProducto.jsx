@@ -1,6 +1,6 @@
-<<<<<<< HEAD
-import React from 'react'
+import React, { useState } from 'react'
 import { productosService } from '../services/productosService'
+import eventBus from '@shared/eventBus'
 
 const TarjetaProducto = ({ producto, rol = 'cliente', usuario, onCanjear, onEditar, onEliminar }) => {
   const costoPuntos = producto.costo_puntos ?? producto.costo ?? 0
@@ -8,11 +8,9 @@ const TarjetaProducto = ({ producto, rol = 'cliente', usuario, onCanjear, onEdit
   const stock = parseInt(producto.stock, 10) || 0
   const sinStock = stock <= 0
   const puntosUsuario = usuario?.puntos ?? 0
-  import { useState } from 'react'
-  import eventBus from '@shared/eventBus'
   const puedeCanjear = !sinStock && puntosUsuario >= costoPuntos
   const tiendaNombre = producto.tienda_nombre || producto.tienda || 'Tienda desconocida'
-    const [mostrarCanje, setMostrarCanje] = useState(false)
+  const [mostrarCanje, setMostrarCanje] = useState(false)
 
   const handleCanjear = () => {
     if (!puedeCanjear) return
@@ -20,28 +18,11 @@ const TarjetaProducto = ({ producto, rol = 'cliente', usuario, onCanjear, onEdit
     else if (typeof window !== 'undefined' && window.__eventBus?.emit) {
       window.__eventBus.emit('add-to-cart', { producto, cantidad: 1 })
     }
-=======
-
-import React, { useState } from 'react'
-import eventBus from '@shared/eventBus'
-
-const TarjetaProducto = ({ producto }) => {
-  const [mostrarCanje, setMostrarCanje] = useState(false)
-
-  const handleComprar = () => {
-    const handleComprar = () => {
-      setMostrarCanje(true)
-    }
-
-    const handleCerrarCanje = () => {
-      setMostrarCanje(false)
-    }
     setMostrarCanje(true)
   }
 
   const handleCerrarCanje = () => {
     setMostrarCanje(false)
->>>>>>> 55f0140 (fix: ajustes menores en micro-productos para compatibilidad con micro-canje)
   }
 
   return (
@@ -54,7 +35,6 @@ const TarjetaProducto = ({ producto }) => {
         />
       </div>
       <div style={styles.contenido}>
-<<<<<<< HEAD
         <h3 style={styles.nombre}>{producto.nombre}</h3>
         {rol === 'cliente' && (
           <p style={styles.tienda}>🏪 {tiendaNombre}</p>
@@ -93,18 +73,6 @@ const TarjetaProducto = ({ producto }) => {
               {sinStock ? 'Sin stock' : puntosUsuario < costoPuntos ? 'Puntos insuficientes' : 'Canjear'}
             </button>
           )}
-=======
-        <h3>{producto.nombre}</h3>
-        <p style={styles.descripcion}>{producto.descripcion}</p>
-        <div style={styles.footer}>
-          <span style={styles.puntos}>⭐ {producto.costo_puntos} pts</span>
-          <button 
-            onClick={handleComprar}
-            style={styles.button}
-          >
-            Comprar
-          </button>
->>>>>>> 55f0140 (fix: ajustes menores en micro-productos para compatibilidad con micro-canje)
         </div>
       </div>
       {mostrarCanje && (
@@ -196,7 +164,6 @@ const styles = {
     backgroundColor: '#0ea5e9',
     color: 'white',
     border: 'none',
-<<<<<<< HEAD
     borderRadius: '6px',
     cursor: 'pointer',
     fontWeight: '600'
@@ -222,9 +189,6 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '0.9rem'
-=======
-    borderRadius: '4px',
-    cursor: 'pointer'
   },
   canjeModal: {
     position: 'fixed',
@@ -246,7 +210,6 @@ const styles = {
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer'
->>>>>>> 55f0140 (fix: ajustes menores en micro-productos para compatibilidad con micro-canje)
   }
 }
 
