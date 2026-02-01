@@ -1,11 +1,15 @@
+
 // assets/js/utils.js
-// Funciones auxiliares y utilidades
+// Funciones auxiliares y utilidades para formateo, validación y cálculos comunes en la app
 
 const Utils = {
   /**
    * Formatea números con separadores de miles
    * @param {number} numero - Número a formatear
    * @returns {string} Número formateado
+   */
+  /**
+   * Formatea un número con separadores de miles (ej: 1.000)
    */
   formatearNumero(numero) {
     return new Intl.NumberFormat('es-EC').format(numero);
@@ -16,6 +20,9 @@ const Utils = {
    * @param {number} puntos - Cantidad de puntos
    * @returns {string} Puntos formateados
    */
+  /**
+   * Devuelve los puntos formateados con sufijo "pts".
+   */
   formatearPuntos(puntos) {
     return `${this.formatearNumero(puntos)} pts`;
   },
@@ -24,6 +31,9 @@ const Utils = {
    * Formatea dinero en USD
    * @param {number} cantidad - Cantidad en dólares
    * @returns {string} Dinero formateado
+   */
+  /**
+   * Formatea una cantidad como dinero en dólares (ej: $10.00)
    */
   formatearDinero(cantidad) {
     return new Intl.NumberFormat('es-EC', {
@@ -36,6 +46,9 @@ const Utils = {
    * Formatea fecha a formato legible
    * @param {Date|string} fecha - Fecha a formatear
    * @returns {string} Fecha formateada
+   */
+  /**
+   * Formatea una fecha a formato legible en español (ej: 1 de enero de 2026)
    */
   formatearFecha(fecha) {
     const date = fecha instanceof Date ? fecha : new Date(fecha);
@@ -50,6 +63,9 @@ const Utils = {
    * Formatea fecha con hora
    * @param {Date|string} fecha - Fecha a formatear
    * @returns {string} Fecha y hora formateadas
+   */
+  /**
+   * Formatea una fecha y hora a formato corto (ej: 1 ene 2026, 14:30)
    */
   formatearFechaHora(fecha) {
     const date = fecha instanceof Date ? fecha : new Date(fecha);
@@ -68,6 +84,9 @@ const Utils = {
    * @param {number} ratio - Ratio de conversión (por defecto 10)
    * @returns {number} Puntos calculados
    */
+  /**
+   * Calcula los puntos a otorgar según el monto de compra y ratio.
+   */
   calcularPuntos(monto, ratio = 10) {
     return Math.floor(monto / ratio) * 10;
   },
@@ -78,6 +97,9 @@ const Utils = {
    * @param {number} ratio - Ratio de conversión (por defecto 100)
    * @returns {number} Valor en dinero
    */
+  /**
+   * Convierte puntos a valor en dólares según el ratio.
+   */
   puntosADinero(puntos, ratio = 100) {
     return puntos / ratio;
   },
@@ -87,6 +109,9 @@ const Utils = {
    * @param {string} email - Email a validar
    * @returns {boolean} True si es válido
    */
+  /**
+   * Valida si un string es un email válido.
+   */
   validarEmail(email) {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
@@ -95,6 +120,9 @@ const Utils = {
   /**
    * Genera un ID único
    * @returns {string} ID único
+   */
+  /**
+   * Genera un ID único basado en timestamp y aleatorio.
    */
   generarId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
