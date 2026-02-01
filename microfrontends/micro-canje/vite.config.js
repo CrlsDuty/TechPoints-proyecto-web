@@ -16,7 +16,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    // El input por defecto es index.html, así que eliminamos rollupOptions.input
   },
   define: {
     'process.env': {}
