@@ -1,6 +1,12 @@
-// app.js - Archivo principal mejorado con protección de rutas
+// app.js - Archivo principal de la aplicación web
+// Incluye protección de rutas y lógica de inicialización
 
-// ========== PROTECCIÓN DE RUTAS ==========
+// ========== PROTECCIÓN DE RUTAS ========== 
+/**
+ * Verifica si el usuario está autenticado y tiene el rol correcto para acceder a la página actual.
+ * Redirige si no cumple los requisitos.
+ * @returns {boolean} true si puede acceder, false si es redirigido
+ */
 function verificarAutenticacion() {
   const usuarioActivo = AuthService.obtenerUsuarioActivo();
   const paginaActual = window.location.pathname;
@@ -31,7 +37,8 @@ function verificarAutenticacion() {
   return true;
 }
 
-// ========== INICIALIZACIÓN ==========
+// ========== INICIALIZACIÓN ========== 
+// Inicializa la aplicación cuando el DOM está listo
 document.addEventListener('DOMContentLoaded', () => {
   AuthService.inicializarUsuarios();
   
