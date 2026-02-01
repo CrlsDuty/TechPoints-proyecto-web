@@ -1,3 +1,27 @@
+---
+
+## 📝 Ejemplos de Consultas SQL Útiles
+
+```sql
+-- Obtener todos los clientes con más de 1000 puntos
+SELECT nombre, email, puntos FROM profiles WHERE puntos > 1000;
+
+-- Listar productos con stock bajo
+SELECT nombre, stock FROM products WHERE stock < 5;
+
+-- Ver historial de transacciones de un usuario
+SELECT * FROM transactions WHERE usuario_id = '<ID_USUARIO>' ORDER BY timestamp DESC;
+```
+
+---
+
+## 💡 Buenas Prácticas
+
+- Realiza backups periódicos de la base de datos.
+- No compartas tus claves de Supabase en público.
+- Usa variables de entorno para las credenciales.
+- Revisa y actualiza las políticas RLS al agregar nuevas tablas.
+
 # 📚 TechPoints - Documentación
 
 ## 🚀 Inicio Rápido
