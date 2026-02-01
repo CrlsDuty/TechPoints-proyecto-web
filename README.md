@@ -1,4 +1,32 @@
+
 # 🚀 TechPoints - Sistema de Fidelización con Supabase
+
+---
+
+## 🖼️ Ejemplo Visual
+
+<p align="center">
+   <img src="docs/preview.png" alt="Vista previa de TechPoints" width="600"/>
+</p>
+
+*Pantalla de ejemplo: catálogo de productos y canje de puntos.*
+
+---
+
+## ❓ Preguntas Frecuentes (FAQ)
+
+**¿Puedo usar este sistema en cualquier tienda?**
+Sí, solo necesitas configurar tus claves de Supabase y adaptar el catálogo.
+
+**¿Qué pasa si Supabase no está disponible?**
+El sistema usa localStorage como respaldo para autenticación y puntos.
+
+**¿Puedo agregar más roles de usuario?**
+Sí, puedes extender la lógica en AuthService y las políticas de Supabase.
+
+**¿Cómo reporto un bug?**
+Abre un issue en GitHub o contacta a los autores en la sección de contribuciones.
+
 
 **TechPoints** es un sistema de puntos y canjes para tiendas afiliadas de tecnología. Los clientes acumulan puntos en sus compras y pueden canjearlos por productos de las tiendas aliadas.
 
