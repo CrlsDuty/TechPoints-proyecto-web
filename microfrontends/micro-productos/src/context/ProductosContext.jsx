@@ -4,8 +4,8 @@ import { productosService } from '../services/productosService'
 
 export const ProductosContext = createContext()
 
-export const ProductosProvider = ({ children }) => {
-  const [usuario, setUsuario] = useState(null)
+export const ProductosProvider = ({ children, usuarioExterno = null }) => {
+  const [usuario, setUsuario] = useState(usuarioExterno)
   const [productos, setProductos] = useState([])
   const [productosFiltrados, setProductosFiltrados] = useState([])
   const [cargando, setCargando] = useState(false)
@@ -16,6 +16,11 @@ export const ProductosProvider = ({ children }) => {
     precioMin: 0,
     precioMax: Infinity
   })
+
+  // Sincronizar usuario externo
+  useEffect(() => {
+    setUsuario(usuarioExterno)
+  }, [usuarioExterno])
 
   const aplicarFiltros = useCallback((lista, f) => {
     let filtrados = lista || []
@@ -83,7 +88,7 @@ export const ProductosProvider = ({ children }) => {
         }
       }
     },
-    [usuario?.id, usuario?.role, filtros, aplicarFiltros]
+    [usuario?.id, usuario?.role, aplicarFiltros]
   )
 
   const actualizarFiltros = useCallback(
@@ -143,54 +148,13 @@ export const ProductosProvider = ({ children }) => {
   )
 
   useEffect(() => {
-    const init = async () => {
-      const {
-        data: { session }
-      } = await supabase.auth.getSession()
-      if (session?.user) {
-        const perfil = await getPerfilUsuario(session.user.id)
-        setUsuario({
-          id: session.user.id,
-          email: session.user.email,
-          nombre: perfil?.nombre || session.user.email?.split('@')[0],
-          puntos: perfil?.puntos ?? 0,
-          role: perfil?.role || 'cliente'
-        })
-      } else {
-        setUsuario(null)
-      }
-    }
-    init()
-
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const perfil = await getPerfilUsuario(session.user.id)
-        setUsuario({
-          id: session.user.id,
-          email: session.user.email,
-          nombre: perfil?.nombre || session.user.email?.split('@')[0],
-          puntos: perfil?.puntos ?? 0,
-          role: perfil?.role || 'cliente'
-        })
-      } else {
-        setUsuario(null)
-      }
-    })
-    return () => subscription?.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    // Solo cargar cuando el usuario cambie (no en cada render)
     if (usuario?.id) {
       cargarProductos(filtros)
     } else {
-      // Si no hay usuario, limpiar productos
       setProductos([])
       setProductosFiltrados([])
     }
-  }, [usuario?.id, usuario?.role]) // Dependencias mínimas para evitar loops
+  }, [usuario?.id, usuario?.role, cargarProductos])
 
   // Cleanup: Abortar solicitudes al desmontar
   useEffect(() => {

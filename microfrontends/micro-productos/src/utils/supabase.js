@@ -29,10 +29,9 @@ export const obtenerProductosConTienda = async (filtros = {}) => {
   const { data, error } = await query.order('creado_at', { ascending: false })
 
   if (error) {
-    console.error('[productos] Error al obtener productos:', error)
     return []
   }
-
+  
   return (data || []).map((p) => ({
     ...p,
     tienda_nombre: p.stores?.nombre || 'Tienda desconocida',
@@ -45,6 +44,7 @@ export const obtenerProductosConTienda = async (filtros = {}) => {
  * Obtener productos de la tienda del usuario (por owner_id)
  */
 export const obtenerProductosPorTienda = async (ownerId) => {
+  console.log('[supabase] Buscando tienda para owner:', ownerId)
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select('id')
@@ -52,10 +52,12 @@ export const obtenerProductosPorTienda = async (ownerId) => {
     .single()
 
   if (storeError || !store) {
-    console.warn('[productos] No se encontró tienda para owner:', ownerId)
+    console.warn('[productos] No se encontró tienda para owner:', ownerId, storeError)
     return []
   }
 
+  console.log('[supabase] Tienda encontrada:', store.id)
+  
   const { data, error } = await supabase
     .from('products')
     .select('*')
@@ -67,6 +69,8 @@ export const obtenerProductosPorTienda = async (ownerId) => {
     return []
   }
 
+  console.log('[supabase] Productos de tienda obtenidos:', data?.length || 0)
+  
   return (data || []).map((p) => ({
     ...p,
     tienda: 'Supabase'
@@ -117,13 +121,18 @@ export const obtenerTiendaId = async (userId) => {
  * Obtener perfil del usuario (role, puntos, nombre) por id de auth
  */
 export const getPerfilUsuario = async (usuarioId) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', usuarioId)
-    .single()
-  if (error) return null
-  return data
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', usuarioId)
+      .single()
+    
+    if (error) return null
+    return data
+  } catch (err) {
+    return null
+  }
 }
 
 export { TASA_CONVERSION }
