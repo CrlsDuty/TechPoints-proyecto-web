@@ -2,6 +2,8 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import Header from '../components/Header'
 import Login from '../auth/Login'
+import GestionUsuarios from '../components/GestionUsuarios'
+import EstadisticasAdmin from '../components/EstadisticasAdmin'
 import { supabase } from '../utils/supabase'
 
 const MICRO_PRODUCTOS_URL = import.meta.env.VITE_MICRO_PRODUCTOS_URL || 'http://localhost:5175'
@@ -12,7 +14,9 @@ const MICRO_HISTORIAL_ORIGIN = new URL(MICRO_HISTORIAL_URL).origin
 export const Dashboard = () => {
   const { usuario, estaAutenticado, loading } = useAuth()
   const [vista, setVista] = useState('inicio') // 'inicio' | 'productos' | 'canje' | 'historial'
+  const [mostrarGestionUsuarios, setMostrarGestionUsuarios] = useState(false)
   const iframeRef = useRef(null)
+  const esTienda = usuario?.role === 'tienda'
 
   const enviarSesionAlIframe = useCallback(async () => {
     const win = iframeRef.current?.contentWindow
@@ -75,7 +79,9 @@ export const Dashboard = () => {
               >
                 ← Volver al inicio
               </button>
-              <h2 style={styles.iframeTitle}>📦 Catálogo de Productos</h2>
+              <h2 style={styles.iframeTitle}>
+                {esTienda ? '📦 Administrar Productos' : '📦 Catálogo de Productos'}
+              </h2>
             </div>
             <iframe
               ref={iframeRef}
@@ -125,48 +131,77 @@ export const Dashboard = () => {
       <main style={styles.main}>
         <div style={styles.container}>
           <h1>¡Bienvenido a TechPoints!</h1>
-          <p style={styles.subtitle}>Sistema de puntos y canjes para tecnología</p>
+          <p style={styles.subtitle}>
+            {esTienda ? 'Panel de administración de tienda' : 'Sistema de puntos y canjes para tecnología'}
+          </p>
           
           {usuario && (
             <div style={styles.userCard}>
               <h3>👤 Mi Perfil</h3>
               <p><strong>Email:</strong> {usuario.email}</p>
               <p><strong>Nombre:</strong> {usuario.nombre}</p>
-              <p><strong>⭐ Puntos:</strong> {usuario.puntos}</p>
+              {esTienda ? (
+                <p><strong>Rol:</strong> Tienda / Administrador</p>
+              ) : (
+                <p><strong>⭐ Puntos:</strong> {usuario.puntos}</p>
+              )}
             </div>
           )}
           
+          {esTienda && <EstadisticasAdmin />}
+          
           <div style={styles.grid}>
             <div style={styles.card}>
-              <h3>📦 Productos</h3>
-              <p>Explora nuestro catálogo de tecnología</p>
+              <h3>{esTienda ? '📦 Mis Productos' : '📦 Productos'}</h3>
+              <p>{esTienda ? 'Administra tu inventario de productos' : 'Explora nuestro catálogo de tecnología'}</p>
               <button
                 type="button"
                 style={styles.cardButton}
                 onClick={() => setVista('productos')}
               >
-                Ver Catálogo
+                {esTienda ? 'Administrar Productos' : 'Ver Catálogo'}
               </button>
             </div>
-            <div style={styles.card}>
-              <h3>🛒 Canjes</h3>
-              <p>Usa tus puntos para canjear productos</p>
-              <button style={styles.cardButton}>Mi Carrito</button>
-            </div>
-            <div style={styles.card}>
-              <h3>📊 Historial</h3>
-              <p>Ve tus compras y canjes anteriores</p>
-              <button 
-                type="button"
-                style={styles.cardButton}
-                onClick={() => setVista('historial')}
-              >
-                Ver Historial
-              </button>
-            </div>
+            {esTienda && (
+              <div style={styles.card}>
+                <h3>👥 Gestión de Usuarios</h3>
+                <p>Administra usuarios y sus puntos</p>
+                <button
+                  type="button"
+                  style={styles.cardButton}
+                  onClick={() => setMostrarGestionUsuarios(true)}
+                >
+                  Gestionar Usuarios
+                </button>
+              </div>
+            )}
+            {!esTienda && (
+              <>
+                <div style={styles.card}>
+                  <h3>🛒 Canjes</h3>
+                  <p>Usa tus puntos para canjear productos</p>
+                  <button style={styles.cardButton}>Mi Carrito</button>
+                </div>
+                <div style={styles.card}>
+                  <h3>📊 Historial</h3>
+                  <p>Ve tus compras y canjes anteriores</p>
+                  <button 
+                    type="button"
+                    style={styles.cardButton}
+                    onClick={() => setVista('historial')}
+                  >
+                    Ver Historial
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>
+      
+      {mostrarGestionUsuarios && (
+        <GestionUsuarios onCerrar={() => setMostrarGestionUsuarios(false)} />
+      )}
     </div>
   )
 }

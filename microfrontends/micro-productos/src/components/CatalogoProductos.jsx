@@ -184,15 +184,20 @@ const CatalogoProductos = () => {
 
       {esTienda && (
         <div style={styles.sectionTienda}>
-          {!mostrarFormAgregar ? (
-            <button
-              type="button"
-              onClick={() => setMostrarFormAgregar(true)}
-              style={styles.btnAgregar}
-            >
-              ➕ Agregar Producto
-            </button>
-          ) : (
+          <div style={styles.adminButtons}>
+            {!mostrarFormAgregar && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMostrarFormAgregar(true)}
+                  style={styles.btnAgregar}
+                >
+                  ➕ Agregar Producto
+                </button>
+              </>
+            )}
+          </div>
+          {mostrarFormAgregar && (
             <div style={styles.formSection}>
               <h3 style={styles.subtitulo}>Agregar Producto</h3>
               <FormProducto
@@ -314,14 +319,30 @@ const styles = {
   sectionTienda: {
     marginBottom: '1.5rem'
   },
+  adminButtons: {
+    display: 'flex',
+    gap: '1rem',
+    flexWrap: 'wrap'
+  },
   btnAgregar: {
-    padding: '0.5rem 1rem',
+    padding: '0.75rem 1.5rem',
     backgroundColor: '#0ea5e9',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontWeight: '600'
+    fontWeight: '600',
+    fontSize: '1rem'
+  },
+  btnUsuarios: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#8b5cf6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '1rem'
   },
   formSection: {
     padding: '1rem',
