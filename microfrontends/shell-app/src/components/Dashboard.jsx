@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import Header from '../components/Header'
 import Login from '../auth/Login'
+import Registro from '../auth/Registro'
 import GestionUsuarios from '../components/GestionUsuarios'
 import EstadisticasAdmin from '../components/EstadisticasAdmin'
 import DashboardCliente from '../components/DashboardCliente'
@@ -18,6 +19,7 @@ export const Dashboard = () => {
   const [vista, setVista] = useState('inicio') // 'inicio' | 'productos' | 'canje' | 'historial'
   const [mostrarGestionUsuarios, setMostrarGestionUsuarios] = useState(false)
   const [mostrarEditarPerfil, setMostrarEditarPerfil] = useState(false)
+  const [mostrarRegistro, setMostrarRegistro] = useState(false)
   const iframeRef = useRef(null)
   const esTienda = usuario?.role === 'tienda'
 
@@ -66,7 +68,10 @@ export const Dashboard = () => {
   }
 
   if (!estaAutenticado) {
-    return <Login />
+    if (mostrarRegistro) {
+      return <Registro onVolverLogin={() => setMostrarRegistro(false)} />
+    }
+    return <Login onIrRegistro={() => setMostrarRegistro(true)} />
   }
 
   if (vista === 'productos') {
