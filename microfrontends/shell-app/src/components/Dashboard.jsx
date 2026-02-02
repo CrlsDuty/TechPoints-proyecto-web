@@ -4,6 +4,8 @@ import Header from '../components/Header'
 import Login from '../auth/Login'
 import GestionUsuarios from '../components/GestionUsuarios'
 import EstadisticasAdmin from '../components/EstadisticasAdmin'
+import DashboardCliente from '../components/DashboardCliente'
+import EditarPerfil from '../components/EditarPerfil'
 import { supabase } from '../utils/supabase'
 
 const MICRO_PRODUCTOS_URL = import.meta.env.VITE_MICRO_PRODUCTOS_URL || 'http://localhost:5175'
@@ -15,6 +17,7 @@ export const Dashboard = () => {
   const { usuario, estaAutenticado, loading } = useAuth()
   const [vista, setVista] = useState('inicio') // 'inicio' | 'productos' | 'canje' | 'historial'
   const [mostrarGestionUsuarios, setMostrarGestionUsuarios] = useState(false)
+  const [mostrarEditarPerfil, setMostrarEditarPerfil] = useState(false)
   const iframeRef = useRef(null)
   const esTienda = usuario?.role === 'tienda'
 
@@ -138,9 +141,21 @@ export const Dashboard = () => {
           
           {usuario && (
             <div style={styles.userCard}>
-              <h3>👤 Mi Perfil</h3>
+              <div style={styles.userCardHeader}>
+                <h3 style={{ margin: 0 }}>👤 Mi Perfil</h3>
+                <button
+                  type="button"
+                  onClick={() => setMostrarEditarPerfil(true)}
+                  style={styles.btnEditarPerfil}
+                >
+                  ✏️ Editar
+                </button>
+              </div>
               <p><strong>Email:</strong> {usuario.email}</p>
               <p><strong>Nombre:</strong> {usuario.nombre}</p>
+              {usuario.metadata?.telefono && (
+                <p><strong>📱 Teléfono:</strong> {usuario.metadata.telefono}</p>
+              )}
               {esTienda ? (
                 <p><strong>Rol:</strong> Tienda / Administrador</p>
               ) : (
@@ -150,6 +165,7 @@ export const Dashboard = () => {
           )}
           
           {esTienda && <EstadisticasAdmin />}
+          {!esTienda && <DashboardCliente usuario={usuario} />}
           
           <div style={styles.grid}>
             <div style={styles.card}>
@@ -196,6 +212,18 @@ export const Dashboard = () => {
       {mostrarGestionUsuarios && (
         <GestionUsuarios onCerrar={() => setMostrarGestionUsuarios(false)} />
       )}
+
+      {mostrarEditarPerfil && (
+        <EditarPerfil 
+          usuario={usuario} 
+          onCerrar={() => setMostrarEditarPerfil(false)}
+          onActualizar={(usuarioActualizado) => {
+            // Actualizar usuario en el contexto si es necesario
+            console.log('[Dashboard] Perfil actualizado:', usuarioActualizado)
+            // El AuthContext debería recargar automáticamente
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -231,6 +259,22 @@ const styles = {
     borderRadius: '8px',
     marginBottom: '2rem',
     boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+  },
+  userCardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem'
+  },
+  btnEditarPerfil: {
+    padding: '0.5rem 1rem',
+    backgroundColor: '#0ea5e9',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    fontWeight: '500'
   },
   grid: {
     display: 'grid',
