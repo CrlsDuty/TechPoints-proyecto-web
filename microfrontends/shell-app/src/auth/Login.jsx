@@ -22,37 +22,55 @@ export const Login = ({ onIrRegistro }) => {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1>TechPoints - Login</h1>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={styles.input}
-          />
-          <PasswordInput
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            name="password"
-            required
-            minLength={8}
-            style={styles.input}
-          />
+        <div style={styles.logoContainer}>
+          <div style={styles.logo}>🎯</div>
+          <h1 style={styles.title}>TechPoints</h1>
+          <p style={styles.subtitle}>Ingresa a tu cuenta</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <div style={styles.inputGroup}>
+            <label style={styles.labelInput}>Email</label>
+            <input
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={styles.input}
+            />
+          </div>
+          
+          <div style={styles.inputGroup}>
+            <label style={styles.labelInput}>Contraseña</label>
+            <PasswordInput
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              name="password"
+              required
+              minLength={8}
+              style={styles.input}
+            />
+          </div>
+          
           <div style={styles.infoBox}>
-            <strong>Requisitos de contraseña:</strong>
+            <strong style={styles.infoTitle}>💡 Requisitos de contraseña:</strong>
             <ul style={styles.lista}>
               <li>Mínimo 8 caracteres</li>
               <li>Al menos una letra mayúscula</li>
               <li>Al menos un signo especial (!@#$%^&*...)</li>
             </ul>
           </div>
-          <button type="submit" disabled={cargando} style={styles.button}>
-            {cargando ? 'Cargando...' : 'Ingresar'}
+          
+          <button type="submit" disabled={cargando} style={cargando ? styles.buttonDisabled : styles.button}>
+            {cargando ? '⏳ Cargando...' : '🚀 Ingresar'}
           </button>
         </form>
+
+        <div style={styles.divider}>
+          <span style={styles.dividerText}>o</span>
+        </div>
 
         <div style={styles.linkContainer}>
           <span style={styles.textGris}>¿No tienes cuenta? </span>
@@ -75,62 +93,135 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5'
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '1rem'
   },
   card: {
     backgroundColor: 'white',
-    padding: '2rem',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+    padding: '2.5rem',
+    borderRadius: '20px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
     width: '100%',
-    maxWidth: '400px'
+    maxWidth: '440px',
+    animation: 'fadeIn 0.5s ease-in'
+  },
+  logoContainer: {
+    textAlign: 'center',
+    marginBottom: '2rem'
+  },
+  logo: {
+    fontSize: '4rem',
+    marginBottom: '0.5rem',
+    animation: 'bounce 2s infinite'
+  },
+  title: {
+    margin: '0.5rem 0',
+    fontSize: '2rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    fontWeight: '700'
+  },
+  subtitle: {
+    margin: '0.25rem 0 0 0',
+    color: '#666',
+    fontSize: '0.95rem'
+  },
+  form: {
+    marginBottom: '1.5rem'
+  },
+  inputGroup: {
+    marginBottom: '1.25rem'
+  },
+  labelInput: {
+    display: 'block',
+    marginBottom: '0.5rem',
+    fontWeight: '600',
+    color: '#333',
+    fontSize: '0.9rem'
   },
   input: {
     width: '100%',
-    padding: '0.75rem',
-    marginBottom: '1rem',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '1rem'
+    padding: '0.875rem 1rem',
+    border: '2px solid #e0e0e0',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    boxSizing: 'border-box',
+    transition: 'all 0.3s ease',
+    outline: 'none'
   },
   infoBox: {
-    backgroundColor: '#e7f3ff',
-    border: '1px solid #b3d9ff',
-    borderRadius: '4px',
-    padding: '0.75rem',
-    marginBottom: '1rem',
-    fontSize: '0.85rem',
-    color: '#004085'
+    backgroundColor: '#f8f9ff',
+    border: '2px solid #e0e7ff',
+    borderRadius: '10px',
+    padding: '1rem',
+    marginBottom: '1.5rem',
+    fontSize: '0.85rem'
+  },
+  infoTitle: {
+    color: '#4f46e5',
+    display: 'block',
+    marginBottom: '0.5rem'
   },
   lista: {
-    margin: '0.5rem 0 0 1rem',
-    paddingLeft: '0.5rem'
+    margin: '0.5rem 0 0 1.25rem',
+    paddingLeft: '0',
+    color: '#666'
   },
   button: {
     width: '100%',
-    padding: '0.75rem',
-    backgroundColor: '#007bff',
+    padding: '1rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
-    fontSize: '1rem',
-    cursor: 'pointer'
+    borderRadius: '10px',
+    fontSize: '1.05rem',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+  },
+  buttonDisabled: {
+    width: '100%',
+    padding: '1rem',
+    background: '#ccc',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '1.05rem',
+    cursor: 'not-allowed',
+    fontWeight: '600'
+  },
+  divider: {
+    textAlign: 'center',
+    margin: '1.5rem 0',
+    position: 'relative'
+  },
+  dividerText: {
+    background: 'white',
+    padding: '0 1rem',
+    color: '#999',
+    position: 'relative',
+    zIndex: 1
   },
   linkContainer: {
-    marginTop: '1.5rem',
-    textAlign: 'center'
+    textAlign: 'center',
+    marginTop: '1.5rem'
   },
   textGris: {
-    color: '#666'
+    color: '#666',
+    fontSize: '0.95rem'
   },
   linkButton: {
     background: 'none',
     border: 'none',
-    color: '#007bff',
+    color: '#667eea',
     cursor: 'pointer',
-    textDecoration: 'underline',
-    fontSize: '1rem',
-    padding: 0
+    textDecoration: 'none',
+    fontSize: '0.95rem',
+    padding: 0,
+    fontWeight: '600',
+    transition: 'color 0.3s ease'
   }
 }
 
