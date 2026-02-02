@@ -26,10 +26,16 @@ export const Header = ({ usuario }) => {
             <button 
               onClick={handleLogout}
               style={styles.logoutButton}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(255,255,255,0.3)'
+                e.target.style.borderColor = 'rgba(255,255,255,0.6)'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(255,255,255,0.2)'
+                e.target.style.borderColor = 'rgba(255,255,255,0.4)'
+              }}
             >
-              Cerrar Sesión
+              🚪 Cerrar Sesión
             </button>
           </div>
         )}
@@ -40,10 +46,10 @@ export const Header = ({ usuario }) => {
 
 const styles = {
   header: {
-    backgroundColor: '#1e40af',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
-    padding: '1rem 0',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+    padding: '1.25rem 0',
+    boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
     position: 'sticky',
     top: 0,
     zIndex: 100
@@ -51,14 +57,15 @@ const styles = {
   container: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '0 1rem',
+    padding: '0 1.5rem',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
   logo: {
     fontSize: '1.5rem',
-    fontWeight: 'bold'
+    fontWeight: '800',
+    textShadow: '0 2px 4px rgba(0,0,0,0.2)'
   },
   userSection: {
     display: 'flex',
@@ -68,25 +75,33 @@ const styles = {
   userInfo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '1rem'
+    gap: '1rem',
+    background: 'rgba(255,255,255,0.1)',
+    padding: '0.75rem 1.25rem',
+    borderRadius: '12px',
+    backdropFilter: 'blur(10px)'
   },
   userName: {
     margin: 0,
-    fontSize: '0.95rem',
-    fontWeight: '600'
+    fontSize: '1rem',
+    fontWeight: '700'
   },
   userPoints: {
     margin: 0,
-    fontSize: '0.85rem',
-    opacity: 0.9
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    opacity: 0.95
   },
   logoutButton: {
-    backgroundColor: '#ef4444',
+    background: 'rgba(255,255,255,0.2)',
     color: 'white',
-    border: 'none',
-    padding: '0.5rem 1rem',
-    borderRadius: '0.375rem',
+    border: '2px solid rgba(255,255,255,0.4)',
+    padding: '0.65rem 1.5rem',
+    borderRadius: '12px',
     cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    backdropFilter: 'blur(10px)',
     fontSize: '0.9rem',
     fontWeight: '600',
     transition: 'background-color 0.2s'
