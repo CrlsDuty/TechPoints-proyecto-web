@@ -182,84 +182,99 @@ const DashboardCliente = ({ usuario }) => {
 const styles = {
   container: {
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '1.5rem',
+    borderRadius: '16px',
+    padding: '2rem',
     marginBottom: '2rem',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.08)'
+    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+    border: '1px solid #f0f0f0'
   },
   loading: {
     textAlign: 'center',
-    padding: '2rem',
-    color: '#64748b'
+    padding: '3rem',
+    color: '#64748b',
+    fontSize: '1.1rem'
   },
   titulo: {
     marginTop: 0,
-    marginBottom: '1.5rem',
-    fontSize: '1.3rem',
-    color: '#1e293b'
+    marginBottom: '2rem',
+    fontSize: '1.75rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    fontWeight: '800'
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '1rem',
-    marginBottom: '1.5rem'
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '1.25rem',
+    marginBottom: '2rem'
   },
   card: {
-    backgroundColor: '#f8fafc',
-    borderRadius: '8px',
-    padding: '1.25rem',
+    background: 'linear-gradient(135deg, #f8faff 0%, #ffffff 100%)',
+    borderRadius: '16px',
+    padding: '1.5rem',
     display: 'flex',
     alignItems: 'center',
     gap: '1rem',
-    border: '1px solid #e2e8f0',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    cursor: 'default'
+    border: '2px solid #f0f0f0',
+    transition: 'all 0.3s ease',
+    cursor: 'default',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
   },
   cardWide: {
-    backgroundColor: '#f8fafc',
-    borderRadius: '8px',
-    padding: '1.25rem',
+    background: 'linear-gradient(135deg, #fff8f0 0%, #ffffff 100%)',
+    borderRadius: '16px',
+    padding: '1.5rem',
     display: 'flex',
     alignItems: 'center',
     gap: '1rem',
-    border: '1px solid #e2e8f0',
-    gridColumn: 'span 2'
+    border: '2px solid #ffeaa7',
+    gridColumn: 'span 2',
+    boxShadow: '0 2px 8px rgba(255,234,167,0.3)'
   },
   cardIcon: {
-    fontSize: '2rem',
-    lineHeight: 1
+    fontSize: '2.5rem',
+    lineHeight: 1,
+    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
   },
   cardContent: {
     flex: 1
   },
   cardValue: {
-    fontSize: '1.5rem',
-    fontWeight: '700',
-    color: '#1e293b',
+    fontSize: '1.75rem',
+    fontWeight: '800',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
     marginBottom: '0.25rem'
   },
   cardLabel: {
-    fontSize: '0.85rem',
+    fontSize: '0.875rem',
     color: '#64748b',
-    fontWeight: '500'
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px'
   },
   resumen: {
-    backgroundColor: '#eff6ff',
-    borderRadius: '8px',
-    padding: '1.25rem',
-    border: '1px solid #bfdbfe'
+    background: 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)',
+    borderRadius: '16px',
+    padding: '1.75rem',
+    border: '2px solid #bae6fd',
+    boxShadow: '0 4px 12px rgba(56, 189, 248, 0.15)'
   },
   resumenTitulo: {
     marginTop: 0,
-    marginBottom: '0.75rem',
-    fontSize: '1rem',
-    color: '#1e40af'
+    marginBottom: '1rem',
+    fontSize: '1.15rem',
+    color: '#0369a1',
+    fontWeight: '700'
   },
   resumenTexto: {
-    margin: '0.5rem 0',
+    margin: '0.75rem 0',
     color: '#334155',
-    fontSize: '0.95rem',
-    lineHeight: '1.6'
+    fontSize: '1rem',
+    lineHeight: '1.7',
+    fontWeight: '500'
   }
 }
 
