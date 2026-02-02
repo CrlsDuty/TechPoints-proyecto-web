@@ -4,15 +4,53 @@ import './GestionUsuarios.css'
 
 const GestionUsuarios = ({ onCerrar }) => {
   const [usuarios, setUsuarios] = useState([])
+  const [usuariosFiltrados, setUsuariosFiltrados] = useState([])
   const [cargando, setCargando] = useState(true)
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null)
   const [puntos, setPuntos] = useState(0)
   const [procesando, setProcesando] = useState(false)
   const [mensaje, setMensaje] = useState(null)
+  
+  // Estados para filtros y búsqueda
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroRole, setFiltroRole] = useState('todos')
+  const [ordenPuntos, setOrdenPuntos] = useState('ninguno')
 
   useEffect(() => {
     cargarUsuarios()
   }, [])
+
+  // Aplicar filtros cuando cambien
+  useEffect(() => {
+    aplicarFiltros()
+  }, [usuarios, busqueda, filtroRole, ordenPuntos])
+
+  const aplicarFiltros = () => {
+    let resultado = [...usuarios]
+
+    // Filtrar por búsqueda
+    if (busqueda.trim()) {
+      const termino = busqueda.toLowerCase()
+      resultado = resultado.filter(user => 
+        user.email?.toLowerCase().includes(termino) ||
+        user.nombre?.toLowerCase().includes(termino)
+      )
+    }
+
+    // Filtrar por rol
+    if (filtroRole !== 'todos') {
+      resultado = resultado.filter(user => user.role === filtroRole)
+    }
+
+    // Ordenar por puntos
+    if (ordenPuntos === 'mayor') {
+      resultado.sort((a, b) => (b.puntos || 0) - (a.puntos || 0))
+    } else if (ordenPuntos === 'menor') {
+      resultado.sort((a, b) => (a.puntos || 0) - (b.puntos || 0))
+    }
+
+    setUsuariosFiltrados(resultado)
+  }
 
   const cargarUsuarios = async () => {
     setCargando(true)
@@ -91,6 +129,48 @@ const GestionUsuarios = ({ onCerrar }) => {
             <div style={styles.loading}>Cargando usuarios...</div>
           ) : (
             <>
+              {/* Barra de búsqueda y filtros */}
+              <div style={styles.filtrosContainer}>
+                <div style={styles.searchBox}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar por email o nombre..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    style={styles.searchInput}
+                  />
+                </div>
+                <div style={styles.filtersRow}>
+                  <div style={styles.filterGroup}>
+                    <label style={styles.filterLabel}>Rol:</label>
+                    <select
+                      value={filtroRole}
+                      onChange={(e) => setFiltroRole(e.target.value)}
+                      style={styles.selectFilter}
+                    >
+                      <option value="todos">Todos</option>
+                      <option value="cliente">Clientes</option>
+                      <option value="tienda">Tiendas</option>
+                    </select>
+                  </div>
+                  <div style={styles.filterGroup}>
+                    <label style={styles.filterLabel}>Ordenar por puntos:</label>
+                    <select
+                      value={ordenPuntos}
+                      onChange={(e) => setOrdenPuntos(e.target.value)}
+                      style={styles.selectFilter}
+                    >
+                      <option value="ninguno">Sin orden</option>
+                      <option value="mayor">Mayor a menor</option>
+                      <option value="menor">Menor a mayor</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={styles.resultadosInfo}>
+                  Mostrando {usuariosFiltrados.length} de {usuarios.length} usuarios
+                </div>
+              </div>
+
               <div style={styles.tabla}>
                 <table className="gestion-usuarios-table">
                   <thead>
@@ -103,7 +183,7 @@ const GestionUsuarios = ({ onCerrar }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {usuarios.map((user) => (
+                    {usuariosFiltrados.map((user) => (
                       <tr key={user.id}>
                         <td>{user.email}</td>
                         <td>{user.nombre || '-'}</td>
@@ -133,6 +213,12 @@ const GestionUsuarios = ({ onCerrar }) => {
                     ))}
                   </tbody>
                 </table>
+
+                {usuariosFiltrados.length === 0 && (
+                  <div style={styles.noResultados}>
+                    No se encontraron usuarios con los filtros aplicados
+                  </div>
+                )}
               </div>
 
               {usuarioSeleccionado && (
@@ -229,6 +315,67 @@ const styles = {
     textAlign: 'center',
     padding: '3rem',
     color: '#666'
+  },
+  filtrosContainer: {
+    marginBottom: '1.5rem',
+    padding: '1rem',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px'
+  },
+  searchBox: {
+    marginBottom: '1rem'
+  },
+  searchInput: {
+    width: '100%',
+    padding: '0.75rem 1rem',
+    fontSize: '1rem',
+    border: '2px solid #e2e8f0',
+    borderRadius: '8px',
+    outline: 'none',
+    transition: 'border-color 0.3s',
+    boxSizing: 'border-box'
+  },
+  filtersRow: {
+    display: 'flex',
+    gap: '1rem',
+    marginBottom: '0.75rem',
+    flexWrap: 'wrap'
+  },
+  filterGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    flex: '1',
+    minWidth: '200px'
+  },
+  filterLabel: {
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    color: '#4a5568',
+    whiteSpace: 'nowrap'
+  },
+  selectFilter: {
+    flex: '1',
+    padding: '0.5rem',
+    fontSize: '0.9rem',
+    border: '1px solid #cbd5e0',
+    borderRadius: '6px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    outline: 'none'
+  },
+  resultadosInfo: {
+    fontSize: '0.85rem',
+    color: '#718096',
+    fontStyle: 'italic',
+    textAlign: 'right'
+  },
+  noResultados: {
+    textAlign: 'center',
+    padding: '2rem',
+    color: '#999',
+    fontSize: '0.95rem',
+    fontStyle: 'italic'
   },
   tabla: {
     overflowX: 'auto'
