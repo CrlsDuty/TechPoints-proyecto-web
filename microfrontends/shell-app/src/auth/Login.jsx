@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import PasswordInput from '../components/PasswordInput'
 
-export const Login = () => {
+export const Login = ({ onIrRegistro }) => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [cargando, setCargando] = useState(false)
@@ -31,14 +32,14 @@ export const Login = () => {
             required
             style={styles.input}
           />
-          <input
-            type="password"
-            placeholder="Password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            name="password"
             required
-            style={styles.input}
             minLength={8}
+            style={styles.input}
           />
           <div style={styles.infoBox}>
             <strong>Requisitos de contraseña:</strong>
@@ -52,6 +53,17 @@ export const Login = () => {
             {cargando ? 'Cargando...' : 'Ingresar'}
           </button>
         </form>
+
+        <div style={styles.linkContainer}>
+          <span style={styles.textGris}>¿No tienes cuenta? </span>
+          <button
+            type="button"
+            onClick={onIrRegistro}
+            style={styles.linkButton}
+          >
+            Regístrate aquí
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -103,6 +115,22 @@ const styles = {
     borderRadius: '4px',
     fontSize: '1rem',
     cursor: 'pointer'
+  },
+  linkContainer: {
+    marginTop: '1.5rem',
+    textAlign: 'center'
+  },
+  textGris: {
+    color: '#666'
+  },
+  linkButton: {
+    background: 'none',
+    border: 'none',
+    color: '#007bff',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    fontSize: '1rem',
+    padding: 0
   }
 }
 
