@@ -98,7 +98,7 @@ export const productosService = {
    * Actualizar producto (tienda). Opcional: nueva imagen (File)
    */
   async actualizarProducto(productoId, ownerId, payload) {
-    const { nombre, costo_puntos, precio_dolar, descripcion, stock, imagenFile, imagen_url } = payload
+    const { nombre, costo_puntos, precio_dolar, descripcion, categoria, stock, imagenFile, imagen_url } = payload
     const tiendaId = await obtenerTiendaId(ownerId)
     if (!tiendaId) {
       return { success: false, message: 'No se encontró la tienda del usuario' }
@@ -115,6 +115,7 @@ export const productosService = {
       ...(costo_puntos != null && { costo_puntos: parseInt(costo_puntos, 10) }),
       ...(precio_dolar != null && { precio_dolar: parseFloat(precio_dolar) }),
       ...(descripcion != null && { descripcion: descripcion.trim() || null }),
+      ...(categoria != null && { categoria: categoria.trim() || null }),
       ...(stock != null && { stock: parseInt(stock, 10) }),
       ...(imagenUrlFinal != null && { imagen_url: imagenUrlFinal })
     }
@@ -141,6 +142,25 @@ export const productosService = {
     const tiendaId = await obtenerTiendaId(ownerId)
     if (!tiendaId) {
       return { success: false, message: 'No se encontró la tienda del usuario' }
+    }
+
+    // Verificar si el producto tiene canjes asociados
+    const { data: canjes, error: errorCanjes } = await supabase
+      .from('redemptions')
+      .select('id')
+      .eq('producto_id', productoId)
+      .limit(1)
+
+    if (errorCanjes) {
+      console.error('[productosService] Error verificar canjes:', errorCanjes)
+      return { success: false, message: 'Error al verificar canjes del producto' }
+    }
+
+    if (canjes && canjes.length > 0) {
+      return { 
+        success: false, 
+        message: 'No se puede eliminar este producto porque ya tiene canjes registrados. Puedes dejarlo sin stock o editarlo.' 
+      }
     }
 
     const { error } = await supabase
