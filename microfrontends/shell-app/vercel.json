@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "name": "techpoints-shell",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "env": {
+    "VITE_SUPABASE_URL": "@supabase_url",
+    "VITE_SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "VITE_MICRO_PRODUCTOS_URL": "https://techpoints-productos.vercel.app",
+    "VITE_MICRO_HISTORIAL_URL": "https://techpoints-historial.vercel.app"
+  }
+}

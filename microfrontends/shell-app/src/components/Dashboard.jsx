@@ -6,6 +6,8 @@ import { supabase } from '../utils/supabase'
 
 const MICRO_PRODUCTOS_URL = import.meta.env.VITE_MICRO_PRODUCTOS_URL || 'http://localhost:5175'
 const MICRO_PRODUCTOS_ORIGIN = new URL(MICRO_PRODUCTOS_URL).origin
+const MICRO_HISTORIAL_URL = import.meta.env.VITE_MICRO_HISTORIAL_URL || 'http://localhost:5174'
+const MICRO_HISTORIAL_ORIGIN = new URL(MICRO_HISTORIAL_URL).origin
 
 export const Dashboard = () => {
   const { usuario, estaAutenticado, loading } = useAuth()
@@ -88,6 +90,35 @@ export const Dashboard = () => {
     )
   }
 
+  if (vista === 'historial') {
+    return (
+      <div style={styles.wrapper}>
+        <Header usuario={usuario} />
+        <main style={styles.main}>
+          <div style={styles.container}>
+            <div style={styles.iframeHeader}>
+              <button
+                type="button"
+                onClick={() => setVista('inicio')}
+                style={styles.btnVolver}
+              >
+                ← Volver al inicio
+              </button>
+              <h2 style={styles.iframeTitle}>📊 Historial de Canjes</h2>
+            </div>
+            <iframe
+              ref={iframeRef}
+              title="Historial de Canjes"
+              src={MICRO_HISTORIAL_URL}
+              style={styles.iframe}
+              onLoad={enviarSesionAlIframe}
+            />
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div style={styles.wrapper}>
       <Header usuario={usuario} />
@@ -125,7 +156,13 @@ export const Dashboard = () => {
             <div style={styles.card}>
               <h3>📊 Historial</h3>
               <p>Ve tus compras y canjes anteriores</p>
-              <button style={styles.cardButton}>Ver Historial</button>
+              <button 
+                type="button"
+                style={styles.cardButton}
+                onClick={() => setVista('historial')}
+              >
+                Ver Historial
+              </button>
             </div>
           </div>
         </div>
