@@ -38,7 +38,16 @@ export const Login = () => {
             onChange={(e) => setPassword(e.target.value)}
             required
             style={styles.input}
+            minLength={8}
           />
+          <div style={styles.infoBox}>
+            <strong>Requisitos de contraseña:</strong>
+            <ul style={styles.lista}>
+              <li>Mínimo 8 caracteres</li>
+              <li>Al menos una letra mayúscula</li>
+              <li>Al menos un signo especial (!@#$%^&*...)</li>
+            </ul>
+          </div>
           <button type="submit" disabled={cargando} style={styles.button}>
             {cargando ? 'Cargando...' : 'Ingresar'}
           </button>
@@ -71,6 +80,19 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '4px',
     fontSize: '1rem'
+  },
+  infoBox: {
+    backgroundColor: '#e7f3ff',
+    border: '1px solid #b3d9ff',
+    borderRadius: '4px',
+    padding: '0.75rem',
+    marginBottom: '1rem',
+    fontSize: '0.85rem',
+    color: '#004085'
+  },
+  lista: {
+    margin: '0.5rem 0 0 1rem',
+    paddingLeft: '0.5rem'
   },
   button: {
     width: '100%',
