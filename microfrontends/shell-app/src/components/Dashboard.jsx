@@ -24,22 +24,23 @@ export const Dashboard = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) {
-        win.postMessage(
-          {
-            type: 'shell-session',
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            expires_at: session.expires_at,
-            usuario: usuario ? {
-              id: usuario.id,
-              email: usuario.email,
-              puntos: usuario.puntos,
-              role: usuario.role,
-              nombre: usuario.nombre
-            } : null
-          },
-          MICRO_PRODUCTOS_ORIGIN
-        )
+        const mensaje = {
+          type: 'shell-session',
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+          expires_at: session.expires_at,
+          usuario: usuario ? {
+            id: usuario.id,
+            email: usuario.email,
+            puntos: usuario.puntos,
+            role: usuario.role,
+            nombre: usuario.nombre
+          } : null
+        }
+        
+        // Enviar a todos los orígenes posibles
+        win.postMessage(mensaje, MICRO_PRODUCTOS_ORIGIN)
+        win.postMessage(mensaje, MICRO_HISTORIAL_ORIGIN)
       }
     } catch (e) {
       console.warn('[Shell] Error enviando sesión al iframe:', e)
@@ -176,24 +177,17 @@ export const Dashboard = () => {
               </div>
             )}
             {!esTienda && (
-              <>
-                <div style={styles.card}>
-                  <h3>🛒 Canjes</h3>
-                  <p>Usa tus puntos para canjear productos</p>
-                  <button style={styles.cardButton}>Mi Carrito</button>
-                </div>
-                <div style={styles.card}>
-                  <h3>📊 Historial</h3>
-                  <p>Ve tus compras y canjes anteriores</p>
-                  <button 
-                    type="button"
-                    style={styles.cardButton}
-                    onClick={() => setVista('historial')}
-                  >
-                    Ver Historial
-                  </button>
-                </div>
-              </>
+              <div style={styles.card}>
+                <h3>📊 Historial</h3>
+                <p>Ve tus canjes realizados</p>
+                <button 
+                  type="button"
+                  style={styles.cardButton}
+                  onClick={() => setVista('historial')}
+                >
+                  Ver Historial
+                </button>
+              </div>
             )}
           </div>
         </div>
