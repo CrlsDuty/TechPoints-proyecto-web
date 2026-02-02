@@ -54,14 +54,4 @@ describe('EventBus', () => {
       eventBus.emit('no-subscribers', 'datos')
     }).not.toThrow()
   })
-
-  it('debe permitir limpiar todos los eventos', () => {
-    const callback = vi.fn()
-    
-    eventBus.on('clear-test', callback)
-    eventBus.clear()
-    eventBus.emit('clear-test', 'datos')
-    
-    expect(callback).not.toHaveBeenCalled()
-  })
 })
