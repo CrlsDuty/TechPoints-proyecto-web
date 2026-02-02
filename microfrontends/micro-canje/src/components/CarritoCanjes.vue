@@ -59,6 +59,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useCanjeStore } from '../stores/canjeStore'
 import { canjeService } from '../services/canjeService'
+import { supabase } from '@shared/supabaseClient'
 import eventBus from '@shared/eventBus'
 import Notification from './Notification.vue'
 
@@ -74,9 +75,52 @@ const puntosValidos = computed(() => {
   return store.puntosDisponibles >= store.puntosTotal
 })
 
-onMounted(() => {
+const obtenerUsuario = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user) {
+      console.log('[Canje] Usuario obtenido:', user.email)
+      
+      // Obtener perfil completo con puntos
+      const { data: perfil } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      
+      if (perfil) {
+        usuario.value = perfil
+        store.setPuntosDisponibles(perfil.puntos || 0)
+        console.log('[Canje] Puntos disponibles:', perfil.puntos)
+      }
+    } else {
+      console.warn('[Canje] No hay usuario autenticado')
+    }
+  } catch (error) {
+    console.error('[Canje] Error obteniendo usuario:', error)
+  }
+}
+
+onMounted(async () => {
+  console.log('[Canje] Componente montado')
+  
+  // Obtener usuario inicial
+  await obtenerUsuario()
+  
+  // Escuchar cambios de autenticación
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      console.log('[Canje] Usuario autenticado')
+      obtenerUsuario()
+    }
+  })
+  
+  // Escuchar evento de usuario desde el shell
   eventBus.on('usuario-sesion', (usuarioData) => {
+    console.log('[Canje] Usuario recibido desde shell:', usuarioData.email)
     usuario.value = usuarioData
+    store.setPuntosDisponibles(usuarioData.puntos || 0)
   })
 })
 
