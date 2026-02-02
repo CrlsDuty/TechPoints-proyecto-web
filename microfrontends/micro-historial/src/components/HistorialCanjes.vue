@@ -11,7 +11,7 @@
     </div>
 
     <div v-else class="canjes-list">
-      <div v-for="canje in canjes" :key="canje.id" class="canje-item">
+      <div v-for="canje in canjesPaginados" :key="canje.id" class="canje-item">
         <div class="canje-imagen" v-if="canje.product?.imagen_url">
           <img :src="canje.product.imagen_url" :alt="canje.product.nombre" />
         </div>
@@ -38,6 +38,36 @@
       </div>
     </div>
 
+    <!-- Paginación -->
+    <div v-if="!cargando && canjes.length > canjesPorPagina" class="paginacion">
+      <button 
+        @click="paginaActual--" 
+        :disabled="paginaActual === 1"
+        class="btn-pagina"
+      >
+        ← Anterior
+      </button>
+      
+      <div class="paginas-numeros">
+        <button
+          v-for="pagina in totalPaginas"
+          :key="pagina"
+          @click="paginaActual = pagina"
+          :class="['btn-numero', { activo: paginaActual === pagina }]"
+        >
+          {{ pagina }}
+        </button>
+      </div>
+      
+      <button 
+        @click="paginaActual++" 
+        :disabled="paginaActual === totalPaginas"
+        class="btn-pagina"
+      >
+        Siguiente →
+      </button>
+    </div>
+
     <div v-if="!cargando && canjes.length > 0" class="estadisticas">
       <div class="stat">
         <h4>Total de Canjes</h4>
@@ -59,9 +89,23 @@ import { supabase } from '../utils/supabase'
 
 const store = useHistorialStore()
 const usuario = ref(null)
+const paginaActual = ref(1)
+const canjesPorPagina = 20
 
 const canjes = computed(() => store.canjes)
 const cargando = computed(() => store.cargando)
+
+// Calcular total de páginas
+const totalPaginas = computed(() => {
+  return Math.ceil(canjes.value.length / canjesPorPagina)
+})
+
+// Obtener canjes de la página actual
+const canjesPaginados = computed(() => {
+  const inicio = (paginaActual.value - 1) * canjesPorPagina
+  const fin = inicio + canjesPorPagina
+  return canjes.value.slice(inicio, fin)
+})
 
 const puntosUsadosTotal = computed(() => {
   return canjes.value.reduce((sum, c) => sum + c.puntos_usados, 0)
@@ -290,5 +334,69 @@ onMounted(async () => {
   font-size: 2rem;
   font-weight: bold;
   color: #007bff;
+}
+
+/* Estilos de paginación */
+.paginacion {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+  padding: 1.5rem 0;
+}
+
+.btn-pagina {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-pagina:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-pagina:disabled {
+  background: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.paginas-numeros {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-numero {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  border: 2px solid #e0e0e0;
+  background: white;
+  color: #666;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-numero:hover {
+  border-color: #667eea;
+  color: #667eea;
+  transform: scale(1.1);
+}
+
+.btn-numero.activo {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 </style>
