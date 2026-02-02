@@ -125,6 +125,79 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const registro = async ({ email, password, nombre, role = 'cliente' }) => {
+    try {
+      console.log('Intentando registrar usuario:', email, role)
+      setError(null)
+
+      // 1. Crear usuario en Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            nombre,
+            role
+          }
+        }
+      })
+
+      if (signUpError) {
+        console.error('Error en signUp:', signUpError)
+        throw signUpError
+      }
+
+      if (!authData.user) {
+        throw new Error('No se pudo crear el usuario')
+      }
+
+      console.log('Usuario creado en Auth:', authData.user.id)
+
+      // 2. Crear perfil en la tabla profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          email,
+          nombre,
+          role,
+          puntos: role === 'cliente' ? 0 : null
+        })
+
+      if (profileError) {
+        console.error('Error creando perfil:', profileError)
+        // No lanzar error aquí, el perfil se puede crear con trigger
+      }
+
+      // 3. Si es tienda, crear registro en la tabla stores
+      if (role === 'tienda') {
+        const { error: storeError } = await supabase
+          .from('stores')
+          .insert({
+            owner_id: authData.user.id,
+            nombre: nombre,
+            email: email
+          })
+
+        if (storeError) {
+          console.error('Error creando tienda:', storeError)
+          // Continuar, puede que el trigger ya lo haya creado
+        }
+      }
+
+      console.log('Registro exitoso completo')
+      
+      // Establecer usuario con perfil completo
+      await establecerUsuario(authData.user)
+
+      return { success: true }
+    } catch (err) {
+      console.error('Error en registro:', err)
+      setError(err.message)
+      return { success: false, error: err.message }
+    }
+  }
+
   const logout = async () => {
     try {
       console.log('Cerrando sesión...')
@@ -152,6 +225,7 @@ export const AuthProvider = ({ children }) => {
       loading,
       error,
       login,
+      registro,
       logout,
       actualizarPerfil,
       estaAutenticado: !!usuario
