@@ -1,7 +1,11 @@
 <template>
-  <div v-if="visible" :class="['notification', type]">
-    {{ message }}
-  </div>
+  <Teleport to="body">
+    <transition name="fade">
+      <div v-if="visible" :class="['notification', props.type]" :key="messageKey">
+        {{ props.message }}
+      </div>
+    </transition>
+  </Teleport>
 </template>
 
 <script setup>
@@ -20,13 +24,21 @@ const props = defineProps({
 })
 
 const visible = ref(false)
+const messageKey = ref(0)
+let timeoutId = null
 
 watch(
   () => props.message,
   (newVal) => {
-    if (newVal) {
+    // Limpiar timeout anterior si existe
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+    
+    if (newVal && newVal.trim()) {
       visible.value = true
-      setTimeout(() => {
+      messageKey.value++
+      timeoutId = setTimeout(() => {
         visible.value = false
       }, props.duration)
     }
@@ -43,14 +55,23 @@ watch(
   border-radius: 6px;
   color: #fff;
   font-weight: bold;
-  z-index: 1000;
+  z-index: 9999;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transition: opacity 0.3s;
 }
 .notification.success {
   background: #4caf50;
 }
 .notification.error {
   background: #f44336;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

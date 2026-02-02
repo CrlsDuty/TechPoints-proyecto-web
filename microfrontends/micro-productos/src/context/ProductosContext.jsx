@@ -1,6 +1,7 @@
 import React, { createContext, useState, useCallback, useEffect } from 'react'
 import { supabase, getPerfilUsuario } from '../utils/supabase'
 import { productosService } from '../services/productosService'
+import eventBus from '@shared/eventBus'
 
 export const ProductosContext = createContext()
 
@@ -155,6 +156,18 @@ export const ProductosProvider = ({ children, usuarioExterno = null }) => {
       setProductosFiltrados([])
     }
   }, [usuario?.id, usuario?.role, cargarProductos])
+
+  // Listener para refetch cuando se completa un canje
+  useEffect(() => {
+    const handleRefetch = () => {
+      if (usuario?.id) {
+        cargarProductos(filtros)
+      }
+    }
+
+    const unsubscribe = eventBus.on('refetch-productos', handleRefetch)
+    return unsubscribe
+  }, [usuario?.id, cargarProductos, filtros])
 
   // Cleanup: Abortar solicitudes al desmontar
   useEffect(() => {

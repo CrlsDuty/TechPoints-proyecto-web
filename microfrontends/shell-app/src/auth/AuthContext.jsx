@@ -77,7 +77,26 @@ export const AuthProvider = ({ children }) => {
       }
     )
 
-    return () => subscription?.unsubscribe()
+    // Escuchar eventos de postMessage desde los iframes (micro-canje)
+    const handleMessage = (event) => {
+      if (event.data?.type === 'canje-completado') {
+        // Actualizar puntos cuando se completa un canje
+        const { puntosRestantes } = event.data
+        setUsuario((prevUsuario) => {
+          if (prevUsuario) {
+            return { ...prevUsuario, puntos: puntosRestantes }
+          }
+          return prevUsuario
+        })
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+
+    return () => {
+      subscription?.unsubscribe()
+      window.removeEventListener('message', handleMessage)
+    }
   }, [sessionChecked])
 
   const login = async (email, password) => {

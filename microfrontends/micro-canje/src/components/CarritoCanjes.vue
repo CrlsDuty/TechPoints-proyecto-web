@@ -1,5 +1,11 @@
 <template>
   <div class="carrito-container">
+    <Notification 
+      :message="notificacion.message"
+      :type="notificacion.type"
+      :duration="3000"
+    />
+    
     <h2>🛒 Carrito de Canjes</h2>
 
     <div v-if="store.carrito.length === 0" class="empty">
@@ -50,16 +56,28 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useCanjeStore } from '../stores/canjeStore'
 import { canjeService } from '../services/canjeService'
+import eventBus from '@shared/eventBus'
+import Notification from './Notification.vue'
 
 const store = useCanjeStore()
 const cargando = ref(false)
-const usuario = ref(null) // Vendría del AuthContext
+const usuario = ref(null)
+const notificacion = ref({
+  message: '',
+  type: 'success'
+})
 
 const puntosValidos = computed(() => {
   return store.puntosDisponibles >= store.puntosTotal
+})
+
+onMounted(() => {
+  eventBus.on('usuario-sesion', (usuarioData) => {
+    usuario.value = usuarioData
+  })
 })
 
 const remover = (productoId) => {
@@ -74,14 +92,44 @@ const confirmar = async () => {
 
   cargando.value = true
   try {
+    // Calcular puntos restantes
+    const puntosUsados = store.puntosTotal
     await canjeService.procesarCanjes(
       usuario.value.id,
       store.carrito,
       store.puntosDisponibles
     )
+    
+    const puntosRestantes = store.puntosDisponibles - puntosUsados
+    
+    // Actualizar puntos en el store
+    store.setPuntosDisponibles(puntosRestantes)
+    
+    // Mostrar notificación de éxito
+    notificacion.value.message = '✓ Canjes realizados exitosamente'
+    notificacion.value.type = 'success'
+    
+    // Notificar al padre (micro-productos) que los puntos se actualizaron
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'canje-completado',
+        puntosRestantes: puntosRestantes,
+        puntosUsados: puntosUsados
+      }, '*')
+    }
+    
+    // Emitir evento local
+    eventBus.emit('canje-exitoso', {
+      puntosRestantes,
+      puntosUsados
+    })
+    
     store.limpiarCarrito()
   } catch (error) {
     console.error('Error en canje:', error)
+    
+    notificacion.value.message = '❌ Error al realizar los canjes'
+    notificacion.value.type = 'error'
   } finally {
     cargando.value = false
   }

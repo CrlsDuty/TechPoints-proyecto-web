@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { productosService } from '../services/productosService'
 import eventBus from '@shared/eventBus'
+import ModalCanjear from './ModalCanjear'
 
 const TarjetaProducto = ({ producto, rol = 'cliente', usuario, onCanjear, onEditar, onEliminar }) => {
   const costoPuntos = producto.costo_puntos ?? producto.costo ?? 0
@@ -14,10 +15,6 @@ const TarjetaProducto = ({ producto, rol = 'cliente', usuario, onCanjear, onEdit
 
   const handleCanjear = () => {
     if (!puedeCanjear) return
-    if (onCanjear) onCanjear(producto.id)
-    else if (typeof window !== 'undefined' && window.__eventBus?.emit) {
-      window.__eventBus.emit('add-to-cart', { producto, cantidad: 1 })
-    }
     setMostrarCanje(true)
   }
 
@@ -76,14 +73,11 @@ const TarjetaProducto = ({ producto, rol = 'cliente', usuario, onCanjear, onEdit
         </div>
       </div>
       {mostrarCanje && (
-        <div style={styles.canjeModal}>
-          {/* Web Component de micro-canje */}
-          <micro-canje-producto 
-            producto={JSON.stringify(producto)}
-            onclose={handleCerrarCanje}
-          />
-          <button onClick={handleCerrarCanje} style={styles.cerrarBtn}>Cerrar</button>
-        </div>
+        <ModalCanjear 
+          producto={producto}
+          usuario={usuario}
+          onClose={handleCerrarCanje}
+        />
       )}
     </div>
   )
@@ -189,27 +183,6 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '0.9rem'
-  },
-  canjeModal: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '100vw',
-    height: '100vh',
-    background: 'rgba(0,0,0,0.4)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-  },
-  cerrarBtn: {
-    marginTop: '1rem',
-    padding: '0.5rem 1rem',
-    background: '#dc3545',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer'
   }
 }
 

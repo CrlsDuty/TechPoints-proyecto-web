@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import Header from '../components/Header'
 import Login from '../auth/Login'
@@ -23,7 +23,14 @@ export const Dashboard = () => {
             type: 'shell-session',
             access_token: session.access_token,
             refresh_token: session.refresh_token,
-            expires_at: session.expires_at
+            expires_at: session.expires_at,
+            usuario: usuario ? {
+              id: usuario.id,
+              email: usuario.email,
+              puntos: usuario.puntos,
+              role: usuario.role,
+              nombre: usuario.nombre
+            } : null
           },
           MICRO_PRODUCTOS_ORIGIN
         )
@@ -31,7 +38,14 @@ export const Dashboard = () => {
     } catch (e) {
       console.warn('[Shell] Error enviando sesión al iframe:', e)
     }
-  }, [])
+  }, [usuario])
+
+  // Enviar sesión actualizada cada vez que cambia el usuario
+  useEffect(() => {
+    if (iframeRef.current && usuario) {
+      enviarSesionAlIframe()
+    }
+  }, [usuario, enviarSesionAlIframe])
 
   if (loading) {
     return (
