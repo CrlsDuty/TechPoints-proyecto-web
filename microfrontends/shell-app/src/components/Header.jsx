@@ -1,5 +1,6 @@
 import React from 'react'
 import { useAuth } from '../auth/AuthContext'
+import AvatarUpload from './AvatarUpload'
 
 export const Header = ({ usuario }) => {
   const { logout } = useAuth()
@@ -17,6 +18,7 @@ export const Header = ({ usuario }) => {
         
         {usuario && (
           <div style={styles.userSection}>
+            <AvatarUpload userId={usuario.id} currentAvatar={usuario.avatar_url} />
             <div style={styles.userInfo}>
               <div>
                 <p style={styles.userName}>{usuario.nombre}</p>

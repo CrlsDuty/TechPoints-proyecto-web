@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../utils/supabase'
+import { CanjesPorCategoriaChart, DistribucionPuntosChart, EvolucionCanjesChart } from './Charts'
+import RankingProductos from './RankingProductos'
 
 const DashboardCliente = ({ usuario }) => {
   const [stats, setStats] = useState({
@@ -98,79 +100,105 @@ const DashboardCliente = ({ usuario }) => {
 
   if (cargando) {
     return (
-      <div style={styles.loading}>
+      <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b', fontSize: '1.1rem' }}>
         <p>Cargando tu dashboard...</p>
       </div>
     )
   }
 
   return (
-    <div style={styles.container}>
+    <div style={{...styles.container, backgroundColor: 'white', borderColor: '#f0f0f0'}}>
       <h3 style={styles.titulo}>📊 Mi Dashboard Personal</h3>
       
       <div style={styles.grid}>
-        <div style={styles.card}>
+        <div style={{...styles.card, background: 'white', borderColor: '#f0f0f0'}}>
           <div style={styles.cardIcon}>🎁</div>
           <div style={styles.cardContent}>
             <div style={styles.cardValue}>{stats.totalCanjes}</div>
-            <div style={styles.cardLabel}>Canjes Totales</div>
+            <div style={{...styles.cardLabel, color: '#64748b'}}>Canjes Totales</div>
           </div>
         </div>
 
-        <div style={styles.card}>
+        <div style={{...styles.card, background: 'white', borderColor: '#f0f0f0'}}>
           <div style={styles.cardIcon}>💰</div>
           <div style={styles.cardContent}>
             <div style={styles.cardValue}>{stats.puntosGastados.toLocaleString()}</div>
-            <div style={styles.cardLabel}>Puntos Gastados</div>
+            <div style={{...styles.cardLabel, color: '#64748b'}}>Puntos Gastados</div>
           </div>
         </div>
 
-        <div style={styles.card}>
+        <div style={{...styles.card, background: 'white', borderColor: '#f0f0f0'}}>
           <div style={styles.cardIcon}>⭐</div>
           <div style={styles.cardContent}>
             <div style={styles.cardValue}>{stats.puntosGanadosTotal.toLocaleString()}</div>
-            <div style={styles.cardLabel}>Puntos Ganados</div>
+            <div style={{...styles.cardLabel, color: '#64748b'}}>Puntos Ganados</div>
           </div>
         </div>
 
-        <div style={styles.card}>
+        <div style={{...styles.card, background: 'white', borderColor: '#f0f0f0'}}>
           <div style={styles.cardIcon}>⏱️</div>
           <div style={styles.cardContent}>
             <div style={styles.cardValue}>{stats.canjesUltimos30Dias}</div>
-            <div style={styles.cardLabel}>Canjes (últimos 30 días)</div>
+            <div style={{...styles.cardLabel, color: '#64748b'}}>Canjes (últimos 30 días)</div>
           </div>
         </div>
 
-        <div style={styles.cardWide}>
+        <div style={{...styles.cardWide, background: 'white', borderColor: '#f0f0f0'}}>
           <div style={styles.cardIcon}>📂</div>
           <div style={styles.cardContent}>
             <div style={styles.cardValue}>{stats.categoriaFavorita}</div>
-            <div style={styles.cardLabel}>Categoría Favorita</div>
+            <div style={{...styles.cardLabel, color: '#64748b'}}>Categoría Favorita</div>
           </div>
         </div>
 
-        <div style={styles.cardWide}>
+        <div style={{...styles.cardWide, background: 'white', borderColor: '#f0f0f0'}}>
           <div style={styles.cardIcon}>🏆</div>
           <div style={styles.cardContent}>
             <div style={{ ...styles.cardValue, fontSize: '0.95rem' }}>
               {stats.productoMasCanjeado}
             </div>
-            <div style={styles.cardLabel}>Producto Más Canjeado</div>
+            <div style={{...styles.cardLabel, color: '#64748b'}}>Producto Más Canjeado</div>
           </div>
         </div>
       </div>
 
-      <div style={styles.resumen}>
-        <h4 style={styles.resumenTitulo}>💡 Resumen de Actividad</h4>
-        <p style={styles.resumenTexto}>
+      {/* Gráficos */}
+      <div style={styles.chartsSection}>
+        <h4 style={{...styles.sectionTitle, color: '#1e293b'}}>📈 Análisis de Actividad</h4>
+        <div style={styles.chartsGrid}>
+          <div style={{...styles.chartCard, background: 'white', borderColor: '#f0f0f0'}}>
+            <h5 style={{...styles.chartTitle, color: '#1e293b'}}>Canjes por Categoría</h5>
+            <CanjesPorCategoriaChart userId={usuario.id} />
+          </div>
+          <div style={{...styles.chartCard, background: 'white', borderColor: '#f0f0f0'}}>
+            <h5 style={{...styles.chartTitle, color: '#1e293b'}}>Distribución de Puntos</h5>
+            <DistribucionPuntosChart 
+              puntosActuales={usuario.puntos}
+              puntosGastados={stats.puntosGastados}
+              puntosGanados={stats.puntosGanadosTotal}
+            />
+          </div>
+        </div>
+        <div style={{...styles.chartCard, background: 'white', borderColor: '#f0f0f0', marginTop: '1.5rem'}}>
+          <h5 style={{...styles.chartTitle, color: '#1e293b'}}>Evolución de Canjes (Últimos 6 Meses)</h5>
+          <EvolucionCanjesChart userId={usuario.id} />
+        </div>
+      </div>
+
+      {/* Ranking de Productos */}
+      <RankingProductos />
+
+      <div style={{...styles.resumen, background: 'white', borderColor: '#667eea'}}>
+        <h4 style={{...styles.resumenTitulo, color: '#667eea'}}>💡 Resumen de Actividad</h4>
+        <p style={{...styles.resumenTexto, color: '#1e293b'}}>
           Has realizado <strong>{stats.totalCanjes}</strong> canjes, gastando un total de{' '}
           <strong>{stats.puntosGastados.toLocaleString()} puntos</strong>.
           {stats.categoriaFavorita !== '-' && (
             <> Tu categoría favorita es <strong>{stats.categoriaFavorita}</strong>.</>
           )}
         </p>
-        <p style={styles.resumenTexto}>
-          Actualmente tienes <strong style={{ color: '#0ea5e9', fontSize: '1.1rem' }}>
+        <p style={{...styles.resumenTexto, color: '#1e293b'}}>
+          Actualmente tienes <strong style={{ color: '#667eea', fontSize: '1.1rem' }}>
             {usuario?.puntos?.toLocaleString() || 0} puntos
           </strong> disponibles para canjear.
         </p>
@@ -255,12 +283,43 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '0.5px'
   },
+  chartsSection: {
+    marginTop: '3rem',
+    marginBottom: '2rem'
+  },
+  sectionTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    marginBottom: '1.5rem',
+    color: '#1e293b'
+  },
+  chartsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '1.5rem',
+    marginBottom: '1.5rem'
+  },
+  chartCard: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '1.5rem',
+    border: '2px solid #f0f0f0',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.06)'
+  },
+  chartTitle: {
+    fontSize: '1.1rem',
+    fontWeight: '700',
+    marginTop: 0,
+    marginBottom: '1rem',
+    color: '#334155'
+  },
   resumen: {
     background: 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%)',
     borderRadius: '16px',
     padding: '1.75rem',
     border: '2px solid #bae6fd',
-    boxShadow: '0 4px 12px rgba(56, 189, 248, 0.15)'
+    boxShadow: '0 4px 12px rgba(56, 189, 248, 0.15)',
+    marginTop: '2rem'
   },
   resumenTitulo: {
     marginTop: 0,
