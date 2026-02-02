@@ -3,6 +3,7 @@ import { useProductos } from '../context/ProductosContext'
 import { productosService } from '../services/productosService'
 import TarjetaProducto from './TarjetaProducto'
 import FormProducto from './FormProducto'
+import BarraFiltros from './BarraFiltros'
 import { CATEGORIAS } from '../constants/categorias'
 
 const Modal = ({ abierto, onCerrar, titulo, children }) => {
@@ -161,25 +162,10 @@ const CatalogoProductos = () => {
       )}
 
       {!esTienda && (
-        <div style={styles.filtros}>
-          <input
-            type="search"
-            placeholder="Buscar por nombre..."
-            value={filtros.busqueda || ''}
-            onChange={(e) => actualizarFiltros({ busqueda: e.target.value })}
-            style={styles.inputBusqueda}
-          />
-          <select
-            value={filtros.categoria || ''}
-            onChange={(e) => actualizarFiltros({ categoria: e.target.value || null })}
-            style={styles.selectCategoria}
-          >
-            <option value="">Todas las categorías</option>
-            {categoriasUnicas.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
+        <BarraFiltros 
+          filtros={filtros} 
+          onActualizarFiltros={actualizarFiltros} 
+        />
       )}
 
       {esTienda && (

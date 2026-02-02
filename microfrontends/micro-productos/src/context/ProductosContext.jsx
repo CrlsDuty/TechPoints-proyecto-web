@@ -15,7 +15,8 @@ export const ProductosProvider = ({ children, usuarioExterno = null }) => {
     categoria: null,
     busqueda: '',
     precioMin: 0,
-    precioMax: Infinity
+    precioMax: Infinity,
+    ordenamiento: 'reciente'
   })
 
   // Sincronizar usuario externo
@@ -39,6 +40,28 @@ export const ProductosProvider = ({ children, usuarioExterno = null }) => {
     if (f.precioMax != null && f.precioMax !== Infinity) {
       filtrados = filtrados.filter((p) => p.costo_puntos <= f.precioMax)
     }
+
+    // Aplicar ordenamiento
+    if (f.ordenamiento) {
+      filtrados.sort((a, b) => {
+        switch (f.ordenamiento) {
+          case 'precio-asc':
+            return a.costo_puntos - b.costo_puntos
+          case 'precio-desc':
+            return b.costo_puntos - a.costo_puntos
+          case 'nombre-asc':
+            return a.nombre.localeCompare(b.nombre)
+          case 'nombre-desc':
+            return b.nombre.localeCompare(a.nombre)
+          case 'stock-desc':
+            return b.stock - a.stock
+          case 'reciente':
+          default:
+            return new Date(b.creado_at || 0) - new Date(a.creado_at || 0)
+        }
+      })
+    }
+
     setProductosFiltrados(filtrados)
   }, [])
 
