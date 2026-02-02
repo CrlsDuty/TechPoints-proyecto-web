@@ -12,12 +12,28 @@
 
     <div v-else class="canjes-list">
       <div v-for="canje in canjes" :key="canje.id" class="canje-item">
+        <div class="canje-imagen" v-if="canje.product?.imagen_url">
+          <img :src="canje.product.imagen_url" :alt="canje.product.nombre" />
+        </div>
         <div class="canje-info">
-          <h4>{{ canje.product?.nombre }}</h4>
-          <p>{{ formatearFecha(canje.creado_at) }}</p>
+          <h4>{{ canje.product?.nombre || 'Producto no disponible' }}</h4>
+          <p class="descripcion">{{ canje.product?.descripcion }}</p>
+          <div class="meta-info">
+            <span class="tienda" v-if="canje.product?.tienda">
+              🏪 {{ canje.product.tienda.nombre }}
+            </span>
+            <span class="categoria" v-if="canje.product?.categoria">
+              📦 {{ canje.product.categoria }}
+            </span>
+            <span class="fecha">📅 {{ formatearFecha(canje.creado_at) }}</span>
+          </div>
+          <div class="estado-info">
+            <span :class="['estado-badge', canje.estado]">{{ canje.estado.toUpperCase() }}</span>
+          </div>
         </div>
         <div class="canje-puntos">
           <span class="puntos-badge">{{ canje.puntos_usados }} ⭐</span>
+          <p class="precio-ref" v-if="canje.product?.precio_dolar">${{ canje.product.precio_dolar }}</p>
         </div>
       </div>
     </div>
@@ -39,6 +55,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useHistorialStore } from '../stores/historialStore'
 import { historialService } from '../services/historialService'
+import { supabase } from '../utils/supabase'
 
 const store = useHistorialStore()
 const usuario = ref(null)
@@ -51,26 +68,60 @@ const puntosUsadosTotal = computed(() => {
 })
 
 const formatearFecha = (fecha) => {
-  return new Date(fecha).toLocaleDateString('es-ES')
+  return new Date(fecha).toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
 }
 
 const cargarHistorial = async () => {
   store.setCargando(true)
   try {
-    // El usuario vendría del AuthContext del shell
-    if (usuario.value?.id) {
-      const datos = await historialService.cargarHistorialCanjes(usuario.value.id)
+    // Obtener usuario autenticado de Supabase
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user) {
+      usuario.value = user
+      console.log('[Historial] Usuario obtenido:', user.email)
+      
+      const datos = await historialService.cargarHistorialCanjes(user.id)
+      console.log('[Historial] Canjes cargados:', datos.length)
       store.setCanjes(datos)
+    } else {
+      console.warn('[Historial] No hay usuario autenticado')
+      store.setCanjes([])
     }
   } catch (error) {
+    console.error('[Historial] Error:', error)
     store.setError(error.message)
   } finally {
     store.setCargando(false)
   }
 }
 
-onMounted(() => {
-  cargarHistorial()
+// Escuchar cambios de sesión
+onMounted(async () => {
+  console.log('[Historial] Componente montado')
+  
+  // Cargar historial inicial
+  await cargarHistorial()
+  
+  // Escuchar evento de canje completado para recargar
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'canje-completado') {
+      console.log('[Historial] Recargando después de canje')
+      cargarHistorial()
+    }
+  })
+  
+  // Listener de cambios de autenticación
+  const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      console.log('[Historial] Usuario autenticado')
+      cargarHistorial()
+    }
+  })
 })
 </script>
 
@@ -96,22 +147,114 @@ onMounted(() => {
 
 .canje-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
+  gap: 1rem;
+  padding: 1.5rem;
   background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.canje-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.canje-imagen {
+  width: 100px;
+  height: 100px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f5f5f5;
+}
+
+.canje-imagen img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.canje-info {
+  flex: 1;
 }
 
 .canje-info h4 {
   margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  color: #333;
 }
 
-.canje-info p {
-  margin: 0;
-  color: #999;
+.canje-info .descripcion {
+  margin: 0 0 0.75rem 0;
+  color: #666;
   font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.meta-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.meta-info span {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.tienda {
+  font-weight: 600;
+  color: #007bff;
+}
+
+.categoria {
+  color: #28a745;
+}
+
+.fecha {
+  color: #999;
+}
+
+.estado-info {
+  margin-top: 0.5rem;
+}
+
+.estado-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.estado-badge.completado {
+  background: #d4edda;
+  color: #155724;
+}
+
+.estado-badge.pendiente {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.estado-badge.cancelado {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.canje-puntos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.precio-ref {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #999;
+  text-decoration: line-through;
 }
 
 .puntos-badge {

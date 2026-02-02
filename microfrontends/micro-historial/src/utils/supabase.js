@@ -9,8 +9,25 @@ export const obtenerHistorialCanjes = async (usuarioId) => {
   const { data, error } = await supabase
     .from('redemptions')
     .select(`
-      *,
-      product:products(nombre, precio_dolar, costo_puntos)
+      id,
+      puntos_usados,
+      estado,
+      creado_at,
+      product:products(
+        id,
+        nombre,
+        descripcion,
+        categoria,
+        costo_puntos,
+        precio_dolar,
+        stock,
+        imagen_url,
+        tienda:stores(
+          id,
+          nombre,
+          descripcion
+        )
+      )
     `)
     .eq('perfil_id', usuarioId)
     .order('creado_at', { ascending: false })
