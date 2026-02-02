@@ -4,7 +4,7 @@ import Header from '../components/Header'
 import Login from '../auth/Login'
 import Registro from '../auth/Registro'
 import GestionUsuarios from '../components/GestionUsuarios'
-import EstadisticasAdmin from '../components/EstadisticasAdmin'
+import DashboardTienda from '../components/DashboardTienda'
 import DashboardCliente from '../components/DashboardCliente'
 import EditarPerfil from '../components/EditarPerfil'
 import { supabase } from '../utils/supabase'
@@ -169,7 +169,7 @@ export const Dashboard = () => {
             </div>
           )}
           
-          {esTienda && <EstadisticasAdmin />}
+          {esTienda && <DashboardTienda />}
           {!esTienda && <DashboardCliente usuario={usuario} />}
           
           <div style={styles.grid}>
